@@ -6,7 +6,9 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 
+import yaml
 from appdaemon.models.config.app import AllAppConfig
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -319,6 +321,91 @@ class RenderConfigTests(unittest.TestCase):
             self.assertIn("kitchen_feeder:", go2rtc)
             self.assertIn("plaf203_example123:", apps)
             self.assertIn("plaf203_second456:", apps)
+
+    def test_camera_audio_is_disabled_by_default(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            data_dir = Path(temporary)
+            options = self.options(devices=[self.manual_device()])
+            render_config.validate(options)
+            self.render_all(options, data_dir)
+
+            config = yaml.safe_load(
+                (data_dir / "go2rtc.yaml").read_text(encoding="utf-8")
+            )
+            source = config["streams"]["petlibro_feeder"]
+            self.assertIsInstance(source, str)
+            self.assertNotIn("audio=", source)
+            self.assertNotIn("ffmpeg:", source)
+
+    def test_camera_audio_renders_shared_aac_source_and_opus_transcoder(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            data_dir = Path(temporary)
+            options = self.options(devices=[self.manual_device()])
+            options["camera_audio"] = True
+            render_config.validate(options)
+            self.assertEqual((True, True), self.render_all(options, data_dir))
+
+            config = yaml.safe_load(
+                (data_dir / "go2rtc.yaml").read_text(encoding="utf-8")
+            )
+            sources = config["streams"]["petlibro_feeder"]
+            self.assertEqual(2, len(sources))
+            self.assertEqual(
+                "true", parse_qs(urlsplit(sources[0]).query)["audio"][0]
+            )
+            self.assertEqual(
+                "ffmpeg:petlibro_feeder#audio=opus", sources[1]
+            )
+
+            # Regeneration is idempotent, and disabling audio restores the
+            # original single-source shape rather than retaining a transcoder.
+            self.assertEqual((False, False), self.render_all(options, data_dir))
+            options["camera_audio"] = False
+            self.assertEqual((True, False), self.render_all(options, data_dir))
+            config = yaml.safe_load(
+                (data_dir / "go2rtc.yaml").read_text(encoding="utf-8")
+            )
+            self.assertIsInstance(config["streams"]["petlibro_feeder"], str)
+
+    def test_camera_audio_uses_each_device_stream_as_its_ffmpeg_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            data_dir = Path(temporary)
+            second = self.manual_device("SECOND456")
+            second.update(
+                name="kitchen_feeder",
+                uid="PLAF20300000000EFGH1",
+                ip_address="192.0.2.101",
+            )
+            options = self.options(devices=[self.manual_device(), second])
+            options["camera_audio"] = True
+            render_config.validate(options)
+            self.render_all(options, data_dir)
+
+            streams = yaml.safe_load(
+                (data_dir / "go2rtc.yaml").read_text(encoding="utf-8")
+            )["streams"]
+            self.assertEqual(
+                "ffmpeg:petlibro_feeder#audio=opus",
+                streams["petlibro_feeder"][1],
+            )
+            self.assertEqual(
+                "ffmpeg:kitchen_feeder#audio=opus",
+                streams["kitchen_feeder"][1],
+            )
+
+    def test_camera_audio_option_accepts_home_assistant_and_environment_values(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            data_dir = Path(temporary)
+            (data_dir / "options.json").write_text(
+                json.dumps({"camera_audio": True}), encoding="utf-8"
+            )
+            self.assertTrue(render_config.load_options(data_dir)["camera_audio"])
+
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.dict(os.environ, {"CAMERA_AUDIO": "true"}, clear=True):
+                self.assertTrue(
+                    render_config.load_options(Path(temporary))["camera_audio"]
+                )
 
     def test_unchanged_render_does_not_rewrite_configs(self):
         with tempfile.TemporaryDirectory() as temporary:

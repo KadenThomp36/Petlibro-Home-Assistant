@@ -49,6 +49,7 @@ DEFAULTS = {
     "devices": [],
     "go2rtc_stream_name": "petlibro_feeder",
     "camera_quality": "hd",
+    "camera_audio": False,
     "go2rtc_api_port": 1984,
     "go2rtc_rtsp_port": 8554,
     "go2rtc_webrtc_port": 8555,
@@ -74,6 +75,7 @@ BOOL_KEYS = {
     "device_discovery",
     "persist_feeder_mqtt",
     "publish_camera_metadata",
+    "camera_audio",
     "verbose_logs",
     "camera_protocol_tracing",
     "enable_debug_dumps",
@@ -537,6 +539,8 @@ def render_go2rtc(
             "uid": uid,
             "quality": str(options["camera_quality"]),
         }
+        if options["camera_audio"]:
+            query["audio"] = "true"
         if options["publish_camera_metadata"]:
             query["status_file"] = status_path
         if options["log_level"] in {"debug", "trace"}:
@@ -549,7 +553,16 @@ def render_go2rtc(
             query["dump_c2d_plain"] = f"/data/petlibro_c2d_{stream_name}.dat"
             query["dump_d2c_plain"] = f"/data/petlibro_d2c_{stream_name}.dat"
         stream_url = f"petlibro://{ip_address}?{urlencode(query)}"
-        streams.append(f"  {stream_name}: {yaml_string(stream_url)}")
+        if options["camera_audio"]:
+            streams.extend(
+                (
+                    f"  {stream_name}:",
+                    f"    - {yaml_string(stream_url)}",
+                    f"    - {yaml_string(f'ffmpeg:{stream_name}#audio=opus')}",
+                )
+            )
+        else:
+            streams.append(f"  {stream_name}: {yaml_string(stream_url)}")
 
     values = {
         "LOG_LEVEL": yaml_string("info"),

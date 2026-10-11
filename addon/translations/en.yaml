@@ -68,6 +68,9 @@ configuration:
   camera_quality:
     name: Camera quality
     description: Request the HD or SD video stream.
+  camera_audio:
+    name: Camera audio
+    description: Enable feeder microphone audio and WebRTC-compatible Opus transcoding.
   go2rtc_api_port:
     name: go2rtc API port
     description: TCP port for the go2rtc web interface and API.

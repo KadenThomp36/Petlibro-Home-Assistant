@@ -31,6 +31,7 @@ users configure the same values in the ignored `docker/.env` file.
 | `devices`                              | `DEVICES_JSON`                         | Optional manual device override array                         |
 | `go2rtc_stream_name`                   | `GO2RTC_STREAM_NAME`                   | go2rtc stream and RTSP URL                                    |
 | `camera_quality`                       | `CAMERA_QUALITY`                       | Petlibro URL `quality` query                                  |
+| `camera_audio`                         | `CAMERA_AUDIO`                         | Inbound AAC and lazy WebRTC Opus transcoding                  |
 | `go2rtc_api_port`                      | `GO2RTC_API_PORT`                      | go2rtc API listener                                           |
 | `go2rtc_rtsp_port`                     | `GO2RTC_RTSP_PORT`                     | go2rtc RTSP listener                                          |
 | `go2rtc_webrtc_port`                   | `GO2RTC_WEBRTC_PORT`                   | go2rtc WebRTC listener                                        |
@@ -55,9 +56,13 @@ ignored. The add-on schema no longer presents them. If Home Assistant reports
 an obsolete-option warning while importing an older backup, save the current
 options once to discard the stale keys.
 
-The supported camera surface now expresses only `camera_quality` (`hd` or
-`sd`). That is a request to the physical device, not a guarantee of the SPS
-resolution that will be observed.
+The supported camera surface expresses `camera_quality` (`hd` or `sd`) and the
+optional `camera_audio` switch. Quality is a request to the physical device,
+not a guarantee of the SPS resolution that will be observed. Audio is disabled
+by default. When enabled, the physical source carries H.264 and AAC; go2rtc
+also creates a demand-driven FFmpeg audio producer so WebRTC consumers can use
+Opus without transcoding video. Native-AAC RTSP clients can continue to select
+the camera track directly.
 
 ## Generated files
 

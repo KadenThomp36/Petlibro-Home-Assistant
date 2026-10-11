@@ -251,6 +251,12 @@ Start with the validated settings:
 camera_quality: hd
 ```
 
+Leave `camera_audio: false` while isolating a video-only problem. If inbound
+audio is part of the reproduction, set it to `true`; the physical source then
+adds AAC and the bundled FFmpeg supplies Opus on demand for WebRTC. A running
+audio transcoder does not prove a browser rendered or played the track, so use
+WebRTC receiver statistics or browser diagnostics when investigating playback.
+
 Then set `log_level: debug`. Petlibro statistics report packet families, media
 loss, ACK progress, and SPS transitions without including raw packets or MQTT
 payloads. Escalate to `log_level: trace` for implementation-level state and

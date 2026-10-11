@@ -116,13 +116,14 @@ field from the update.
 
 ## Camera and go2rtc
 
-| Option               | Default           | Description                                                                                      |
-| -------------------- | ----------------- | ------------------------------------------------------------------------------------------------ |
+| Option               | Default           | Description                                                                                       |
+| -------------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
 | `go2rtc_stream_name` | `petlibro_feeder` | Compatibility name for a migrated legacy device; discovered devices derive a product/serial name |
-| `camera_quality`     | `hd`              | Requested `hd` or `sd` stream                                                                    |
-| `go2rtc_api_port`    | `1984`            | Web interface and API TCP port                                                                   |
-| `go2rtc_rtsp_port`   | `8554`            | RTSP TCP port                                                                                    |
-| `go2rtc_webrtc_port` | `8555`            | WebRTC TCP/UDP port                                                                              |
+| `camera_quality`     | `hd`              | Requested `hd` or `sd` stream                                                                     |
+| `camera_audio`       | `false`           | Enable inbound feeder-microphone audio and WebRTC-compatible Opus transcoding                     |
+| `go2rtc_api_port`    | `1984`            | Web interface and API TCP port                                                                    |
+| `go2rtc_rtsp_port`   | `8554`            | RTSP TCP port                                                                                     |
+| `go2rtc_webrtc_port` | `8555`            | WebRTC TCP/UDP port                                                                               |
 
 The tested HD stream may first emit a 640x360 SPS and switch to 1920x1080 later.
 The camera adapter automatically waits up to 15 seconds for that transition.
@@ -130,6 +131,15 @@ Some observed sessions transitioned after several minutes and were initially
 advertised as 640x360. `camera_quality` is the request sent to the device;
 runtime `actual_resolution` is the observed SPS and is not forced by that
 request.
+
+`camera_audio` is disabled by default for backward compatibility. Enabling it
+requests inbound AAC (44.1 kHz mono on the tested PLAF203). Native-AAC clients may consume
+that track directly; when a WebRTC client needs browser-compatible audio,
+go2rtc lazily starts its bundled FFmpeg to transcode audio only to Opus. The
+H.264 track remains direct, all consumers share the same physical camera
+session, and the transcoder exits when no compatible audio consumer needs it.
+This option is receive-only: speaker audio and browser microphone backchannel
+are not implemented for the Petlibro source.
 
 ## Home Assistant controls
 

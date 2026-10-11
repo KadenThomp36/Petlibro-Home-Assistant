@@ -144,6 +144,12 @@ owned by `AUDIOSTART` rather than the LOGIN trailer.
 Firmware strings distinguish `AUDIOSTART` registration from `AUDIOSTOP`
 unregistration and expose separate `SPEAKERSTART` / `SPEAKERSTOP` handling for
 client-to-camera audio. The current implementation provides inbound AAC only.
+The add-on's optional `camera_audio` setting renders the Petlibro source with
+`audio=true` and adds `ffmpeg:<stream>#audio=opus` as a second source on the
+same logical go2rtc stream. FFmpeg consumes only the native AAC track and is
+started on demand; H.264 remains direct and no second Petlibro session is
+created. This topology has been hardware-tested with native AAC RTSP, Opus
+RTSP, and Chromium WebRTC decoding.
 Session close sends the established best-effort `IPCAM_STOP` and closes UDP;
 whether an explicit `AUDIOSTOP` first improves camera-side cleanup has not been
 verified against an OEM close capture or a measurable hardware failure. Do not

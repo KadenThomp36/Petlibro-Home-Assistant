@@ -86,6 +86,12 @@ separate option.
 | `audio=true` | `false` | Requests AAC audio after video start |
 | `strict=1` | off | Drops damaged IDRs instead of emitting them; may freeze until a clean IDR. Dependent P-frames are always suppressed after a reference AU is dropped. |
 
+Packaged add-on users should use `camera_audio: true` rather than editing the
+generated URL. The renderer adds `audio=true` and a demand-driven
+`ffmpeg:<stream>#audio=opus` source. Native AAC and transcoded Opus are separate
+go2rtc tracks; H.264 is not transcoded. This enables feeder-microphone audio
+only and does not implement the speaker/backchannel direction.
+
 The Petlibro stream-control body is capture-backed. The zero-valued data-delay
 control follows the public TUTK AVAPI sequence and was the packaged add-on's
 validated default; the repository does not claim that every firmware requires

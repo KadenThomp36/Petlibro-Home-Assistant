@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.12-beta.5
+
+- Add optional inbound PLAF203 microphone audio, disabled by default
+  for backward compatibility.
+- Enable native AAC through the physical Petlibro stream and on-demand
+  AAC-to-Opus transcoding through the bundled go2rtc/FFmpeg integration
+  for WebRTC-compatible playback.
+- Preserve direct H.264 delivery, shared physical camera sessions,
+  independent consumer handling, and clean transcoder teardown.
+- Validate microphone audio using physical hardware, native AAC and Opus
+  decoding, and Chromium WebRTC audio measurements. Full speaker
+  backchannel support is not yet implemented.
+
 ## 0.3.12-beta.4
 
 - Correctly parse the capture-backed extended AAC packet forms emitted by the
