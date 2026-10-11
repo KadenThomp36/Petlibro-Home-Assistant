@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.12-beta.3
+
+- Fix PLAF203 SD-stream throttling when the camera retains a later AV sequence
+  origin, while preserving the firmware-derived ACK/NACK window behavior and
+  normal missing-packet recovery.
+- Preserve decoder continuity after a reference P-picture or transport output
+  drop, and maintain RTP timestamp continuity across physical producer
+  replacements.
+- Correct RTSP buffered-write failure handling, connection cleanup, short-write
+  detection, and concurrent byte accounting; improve transport media-output
+  metrics and IOCtrl response diagnostics.
+- Expand hardware-informed deterministic and race regression coverage. Direct
+  PLAF203 testing and software decoding informed these changes; Frigate/QSV
+  compatibility has not been validated end to end. Runtime H.264 configuration
+  changes and the firmware policy behind rapid-session HD/SD transitions remain
+  under investigation.
+
 ## 0.3.12-beta.2
 
 - Refactor PLAF203 camera logging around operational lifecycle,

@@ -72,8 +72,8 @@ second implementation.
 
 ## Deliberately retained transport policies
 
-`forceDrain`, independent receive ACK tracking, pending-IDR flush, strict GOP
-poisoning, and gapped-IDR/non-strict recovery remain live. They protect observed
+`forceDrain`, independent receive ACK tracking, pending-IDR flush, reference-GOP
+recovery, and gapped-IDR/non-strict recovery remain live. They protect observed
 loss/reordering and incomplete-end-fragment behavior; the newer ACK model does
 not prove those media conditions impossible. They remain below the camera
 boundary, with tests for the crucial invariant that force-draining output never

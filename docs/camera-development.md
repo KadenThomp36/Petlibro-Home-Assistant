@@ -66,11 +66,19 @@ Preserve these boundaries when modifying the implementation:
   successful assembly.
 - Key/IDR-family video (`0x05`), inter-frame video (`0x07`), and audio (`0x03`)
   keep independent frame-assembly state.
+- Bootstrap usually reports AV sequence `0x3fff` before HD media begins at
+  `0x4000`, but hardware SD sessions have retained a later camera-global
+  sequence. When bootstrap has not observed media, the first runtime video
+  packet may establish that retained origin only when the jump exceeds the
+  complete NACK window. Audio arriving before that decision is not origin
+  evidence and is omitted until it can be projected safely; representable
+  initial video holes remain loss and are NACKed normally.
 - The regular reorder drain cadence is 100 ms and the force-drain buffer
   threshold is 8 entries. Change either only as an isolated, measured
   experiment.
-- `strict=1` changes damaged-GOP output policy; it must not change packet
-  classification, receive tracking, or ACK semantics.
+- `strict=1` decides whether a damaged IDR is emitted; it must not change packet
+  classification, receive tracking, or ACK semantics. A dropped reference P
+  access unit always suppresses dependent P pictures until the next IDR.
 - The transport must not import go2rtc consumer lifecycle. The camera adapter
   must return an SPS-bearing keyframe followed by an unbroken live GOP, and
   media with forward modular RTP clock progression, including normal `uint32`
@@ -93,6 +101,11 @@ acted on a datagram. Hardware observations are called out explicitly in these
 guides. In particular, PLAF203 audio has been observed as 44.1 kHz AAC, but no
 firmware guarantee for that rate is known; the adapter and published ADTS codec
 therefore use native 1024-sample AAC clock steps instead of a 44.1 kHz formula.
+
+Hardware captures also show the PLAF203's P slices with `nal_ref_idc=3`; they
+are reference pictures. It is therefore unsafe to drop one P access unit and
+then forward the rest of that GOP on the assumption that every P picture refers
+only to the IDR.
 
 ## Media header layouts
 
@@ -185,6 +198,19 @@ add up to one GOP after the 15-second preference window, but avoids handing a
 decoder an IDR followed by P-frames with missing references. Requested audio
 discovery has its own readiness interval, so when both audio and video
 resynchronization are pending the total post-stabilization delay can be longer.
+
+Controlled hardware runs established that `quality=hd` can produce 1920x1080
+and `quality=sd` can produce 640x360, but the selection is not an exclusive
+per-session resolution guarantee. Rapidly overlapping or recently closed AV
+sessions caused an HD-requested encoder to move 1920x1080 -> 640x360 ->
+1920x1080 as camera-side session state decayed. `onlineNum` lagged explicit
+STOP by roughly 22 seconds in those runs. Treat it as firmware session-state
+evidence, not as an exact count of live add-on producers or viewers.
+
+Software FFmpeg decoded those in-band SPS/profile/level transitions both from
+the add-on RTSP endpoint and through a second go2rtc RTSP hop. That is useful
+negative evidence against a universal codec-epoch failure, but does not validate
+browser, QSV, or every persistent downstream decoder.
 
 ## Adding configuration options
 

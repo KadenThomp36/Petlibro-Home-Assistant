@@ -84,7 +84,7 @@ separate option.
 | --- | --- | --- |
 | `quality=hd` or `quality=sd` | `hd` | Selects the requested stream and builds the corresponding stream-control command |
 | `audio=true` | `false` | Requests AAC audio after video start |
-| `strict=1` | off | Drops damaged IDRs and dependent P-frames until a clean GOP begins; may freeze on genuine loss |
+| `strict=1` | off | Drops damaged IDRs instead of emitting them; may freeze until a clean IDR. Dependent P-frames are always suppressed after a reference AU is dropped. |
 
 The Petlibro stream-control body is capture-backed. The zero-valued data-delay
 control follows the public TUTK AVAPI sequence and was the packaged add-on's
@@ -118,7 +118,8 @@ progress through the server-side media path:
 
 | Field | Interpretation |
 | --- | --- |
-| `packets_per_second` / `video_frames_per_second` | Transport input and complete assembled-video rates |
+| `packets_per_second` / `video_frames_per_second` | Transport input and video-AU rates successfully queued to the camera adapter |
+| `video_frames_queued` | Complete video AUs accepted by the transport-to-adapter queue during the interval |
 | `adapter_video_units` | Video access units handed out by the camera adapter |
 | `producer_video_units` | Video access units successfully written to a matched go2rtc receiver track |
 | `reader_queue_drops` / `output_queue_drops` | Local receive or assembled-output queue overflow |
@@ -137,7 +138,8 @@ available in the TRACE `transport diagnostics` event. Its fields include:
 | `fragIdxGap` | Fragment indices skipped within a frame |
 | `expectedDataShortfall` | End fragment arrived before all expected data fragments |
 | `zeroDataHardDrop` | A multi-fragment frame ended with no usable data fragments |
-| `strictIDRDrop/strictPDrop` | Frames suppressed by strict GOP policy |
+| `strictIDRDrop/strictPDrop` | Frames suppressed by the optional strict damaged-IDR policy |
+| `gopRecoveryDrop` | Dependent P-frames suppressed after a reference access unit was dropped |
 | `deferredDrop` | Packet arrived after the assembler output cursor had already passed it |
 | `extendedMedia parsed/rejected` | Alternate 44-byte media-header candidates accepted or rejected |
 | `unknown0c08/unknown0c0d` | Remaining unparsed members of the common extended-media families |
@@ -219,7 +221,9 @@ usable stream. Inspect the go2rtc log before the RTSP request for:
 ### HD request advertises 640x360
 
 The camera can begin with a 640x360 SPS and switch to 1920x1080 several seconds
-later. Enable Petlibro debug logging and look for the selected startup
+later. Hardware tests also observed live 1080p -> 360p -> 1080p transitions
+during rapid overlapping/recent AV sessions despite an HD request. Enable
+Petlibro debug logging and look for the selected startup
 configuration or `camera codec configuration changed`. The
 adapter waits up to 15 seconds for this transition before publishing the
 initial track. A later transition is still forwarded in-band, but the original
@@ -231,9 +235,11 @@ profile, level, or resolution.
 
 Corruption plus nonzero fragment-loss counters indicates an incomplete access
 unit, not necessarily a viewer problem. Check extended-media reject counters
-and sequence backlog first. `strict=1` can suppress damaged GOPs but is a
-presentation policy, not packet recovery, and may replace corruption with a
-freeze.
+and sequence backlog first. Hardware captures show reference P pictures, so a
+dropped P access unit causes transport output to wait for the next IDR rather
+than knowingly forward a broken prediction chain. `strict=1` additionally
+drops damaged IDRs; it is a presentation policy, not packet recovery, and may
+replace corruption with a longer freeze.
 
 ## Plaintext packet captures
 
