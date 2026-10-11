@@ -307,15 +307,17 @@ not require a live camera.
 
 The PLAF203 alternates between a normal 36-byte media header and a structurally
 validated 44-byte header. The extended path recognizes inner families `0c08`,
-`0c09`, `0c0c`, and `0c0d`; the common `0c08` packets carry data fragments and
-`0c0d` packets commonly carry the final fragment and frame-info bytes.
+`0c09`, `0c0c`, and `0c0d`. Data families carry video fragments. End families
+carry either a video end fragment with FRAMEINFO or a complete channel-`0x03`
+ADTS unit without FRAMEINFO.
 
 When `trace_packets=1`, each candidate logs structural metadata: its type,
 acceptance, channel,
-`subWire`, fragment counts, payload length, frame number, `nextFrameLike`, extra
-length, and rejection reason. A valid extended packet is marked received for
-ACK purposes before assembly decisions, preventing parser rejection from
-creating an artificial ACK hole.
+`subWire`, fragment counts, payload length, shared frame number, secondary
+media-frame number, extra length, and rejection reason. The secondary counter
+is not required to equal the shared frame number plus one. A valid extended
+packet is marked received for ACK purposes before assembly decisions,
+preventing parser rejection from creating an artificial ACK hole.
 
 ## What server logs can and cannot prove
 

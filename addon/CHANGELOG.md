@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.12-beta.4
+
+- Correctly parse the capture-backed extended AAC packet forms emitted by the
+  PLAF203, restoring contiguous shared audio/video receive tracking and
+  preventing parser-induced ACK/NACK backlogs and video degradation when
+  inbound audio is enabled.
+- Serialize receiver child transfer with in-flight track forwarding during
+  physical producer replacement, eliminating a concurrent receiver-graph race.
+- Expand capture-backed parser tests, physical-hardware and RTSP/software AAC
+  validation, and repeated race regression coverage. Inbound AAC is validated;
+  speaker transmission and browser/WebRTC audio remain outside this release.
+
 ## 0.3.12-beta.3
 
 - Fix PLAF203 SD-stream throttling when the camera retains a later AV sequence

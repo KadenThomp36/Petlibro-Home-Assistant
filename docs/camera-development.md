@@ -122,11 +122,33 @@ The PLAF203 also emits an extended 44-byte layout in inner families `0c08`,
 | `30` | 2 | Fragment index |
 | `32` | 2 | Payload length |
 | `36` | 4 | Frame number |
-| `40` | 4 | `nextFrameLike` (meaning not proven) |
+| `40` | 4 | Secondary media-frame counter (exact SDK name not proven) |
 | `44` | variable | Payload followed by optional frame-info bytes |
 
-`nextFrameLike` remains an uncertainty marker. FRAMEINFO byte 4 is `onlineNum`
-(the AF203 online AV-client count/state), not an HD/SD stream selector.
+Audio-enabled hardware captures disprove the earlier `frame number + 1`
+interpretation for offset 40. It advances independently for interleaved media
+families and is diagnostic only; it is not a packet-validity condition.
+Extended `0c09`/`0c0d` packets may carry either a video end fragment with
+FRAMEINFO or a complete channel-`0x03` ADTS unit without FRAMEINFO. FRAMEINFO
+byte 4 is `onlineNum` (the AF203 online AV-client count/state), not an HD/SD
+stream selector.
+
+## Audio control lifecycle
+
+Inbound audio follows the capture-backed control order used by the supported
+client: query `GETAUDIOOUTFORMAT`, send `IPCAM_START`, then send the separate
+`AUDIOSTART` IOCtrl when audio was requested. Captured LOGIN pairs leave
+`enable_audio_on_connect` disabled, so runtime AAC activation is intentionally
+owned by `AUDIOSTART` rather than the LOGIN trailer.
+
+Firmware strings distinguish `AUDIOSTART` registration from `AUDIOSTOP`
+unregistration and expose separate `SPEAKERSTART` / `SPEAKERSTOP` handling for
+client-to-camera audio. The current implementation provides inbound AAC only.
+Session close sends the established best-effort `IPCAM_STOP` and closes UDP;
+whether an explicit `AUDIOSTOP` first improves camera-side cleanup has not been
+verified against an OEM close capture or a measurable hardware failure. Do not
+guess that command's body or add microphone transmission without first mapping
+the speaker control and audio-send framing.
 
 ## Tests
 
