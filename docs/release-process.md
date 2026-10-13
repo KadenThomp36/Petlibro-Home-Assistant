@@ -47,10 +47,12 @@ such as `v0.3.10-beta.1`. The workflow publishes only the exact versioned GHCR
 tag. It must never publish or overwrite `latest`. GitHub Pre-release objects
 are optional and are not needed for Home Assistant update notifications.
 
-The workflow fails closed when `main` contains a prerelease version, when
-`develop` contains anything other than `x.y.z-beta.N`, or when the configured
-versioned image tag already exists. Increment the version instead of moving a
-published tag or overwriting a published image.
+Before preparing or publishing an image, the workflow runs
+`./scripts/validate.sh --strict`. It also fails closed when `main` contains a
+prerelease version, when `develop` contains anything other than
+`x.y.z-beta.N`, or when the configured versioned image tag already exists.
+Increment the version instead of moving a published tag or overwriting a
+published image.
 
 ## Promotion to stable
 

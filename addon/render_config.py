@@ -711,6 +711,7 @@ def _manual_devices(options: dict[str, object]) -> list[dict[str, object]]:
 
 
 def prepare_registry(options: dict[str, object], data_dir: Path) -> dict[str, object]:
+    """Merge manual overrides into a render-local registry view."""
     registry = load_registry(data_dir)
     devices = registry["devices"]
     assert isinstance(devices, dict)
@@ -754,10 +755,6 @@ def prepare_registry(options: dict[str, object], data_dir: Path) -> dict[str, ob
         current["ready"] = ready
         current["manual_override"] = True
         devices[key] = current
-    atomic_write(
-        data_dir / "devices.json",
-        json.dumps(registry, indent=2, sort_keys=True) + "\n",
-    )
     return registry
 
 
@@ -906,6 +903,12 @@ def render_appdaemon(
     options: dict[str, object], data_dir: Path, template_dir: Path
 ) -> bool:
     registry = prepare_registry(options, data_dir)
+    # AppDaemon owns registry persistence. The go2rtc service may render in
+    # parallel during startup and must not replace newer discovery state.
+    atomic_write(
+        data_dir / "devices.json",
+        json.dumps(registry, indent=2, sort_keys=True) + "\n",
+    )
     common = {
         "MQTT_HOST": yaml_string(options["mqtt_host"]),
         "MQTT_PORT": str(options["mqtt_port"]),

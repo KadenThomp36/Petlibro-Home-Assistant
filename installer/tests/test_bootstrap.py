@@ -148,6 +148,18 @@ class BootstrapConfigTests(unittest.TestCase):
         value.validate()
         self.assertEqual("3.1.49", _select_target_version(value, "3.1.48"))
 
+    def test_untested_observed_firmware_is_rejected_by_default(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "not supported for automatic bootstrap"):
+            _select_target_version(config(), "3.1.49")
+
+    def test_explicit_override_is_the_lab_path_for_untested_firmware(self) -> None:
+        self.assertEqual(
+            "3.1.49",
+            _select_target_version(
+                config(target_software_version="3.1.49"), "3.1.49"
+            ),
+        )
+
     def test_requires_a_valid_startup_version_even_with_override(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "DEVICE_START_EVENT"):
             _select_target_version(config(target_software_version="3.1.49"), None)

@@ -66,6 +66,9 @@ class BootstrapPaused(RuntimeError):
     """Raised when the operator safely stops before the OTA is published."""
 
 
+SUPPORTED_FIRMWARE_VERSION = "3.1.48"
+
+
 @dataclass(frozen=True)
 class BootstrapConfig:
     feeder_ip: str
@@ -506,7 +509,21 @@ def _probe_state_agent(config: BootstrapConfig, token: str) -> None:
 def _select_target_version(config: BootstrapConfig, detected: str | None) -> str:
     if detected is None or not re.fullmatch(r"3\.[0-9]+\.[0-9]+", detected):
         raise RuntimeError("the feeder did not publish a valid 3.x DEVICE_START_EVENT version")
-    return config.target_software_version or detected
+    if detected == SUPPORTED_FIRMWARE_VERSION:
+        return config.target_software_version or detected
+    if config.target_software_version:
+        print(
+            f"WARNING: observed firmware {detected} is outside the demonstrated "
+            f"{SUPPORTED_FIRMWARE_VERSION} contract; continuing only because an explicit "
+            "target_software_version override was configured."
+        )
+        return config.target_software_version
+    raise RuntimeError(
+        f"firmware {detected} is not supported for automatic bootstrap; only "
+        f"{SUPPORTED_FIRMWARE_VERSION} has demonstrated slot, startup, provisioning, "
+        "and persistent-state compatibility. Set target_software_version only for an "
+        "intentional recovery-capable lab run."
+    )
 
 
 def _wait_for_feeder_identity(

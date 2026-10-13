@@ -164,16 +164,28 @@ do not interfere with this MQTT capture stage.
 > firmware variant. Use stable power and only modify hardware you own and can
 > recover.
 
+Automatic bootstrap admission is therefore limited to observed firmware
+`3.1.48`. The existing `target_software_version` override is a deliberate lab
+escape hatch for recovery-capable investigation of another observed `3.x.y`;
+it is not a claim that the selected firmware has compatible slots, startup,
+provisioning commands, or persistent-state files.
+
 The payload validates the opposite slot as an ELF donor and durably selects it
 before modifying the payload slot. It installs production services, copies and
 verifies the donor over the temporary payload, restores both slots to OEM
 firmware, writes a minimal startup script, and selects OTA1. A handled failure
 reselects the untouched donor. Do not remove feeder power during this window.
 
-Before changing startup or sidecar services, the payload saves the first
-feeder-local `attr/` and `feed_plan/` trees under the mode-restricted
-`/user/data/plaf203-bootstrap/preinstall-state/` directory. A retry does not
-replace a completed snapshot. This is a recovery copy, not a second live state
+Before changing startup or sidecar services, every payload execution captures
+and validates the current feeder-local `attr/` and `feed_plan/` trees under the
+mode-restricted `/user/data/plaf203-bootstrap/preinstall-state/` directory.
+Attempts use collision-safe names such as `snapshot-000001`; each new attempt
+uses the next available number and never changes an earlier directory. The
+`complete` marker is written only after the required state and plan files pass
+structural validation. An interrupted or invalid capture remains without that
+marker, and a retry creates another snapshot instead of reusing it. Snapshots
+are not automatically restored, selected, migrated, or pruned. They are
+recovery evidence for explicit maintenance decisions, not a second live state
 source; normal operation and reconciliation continue to use the OEM files.
 
 The temporary broker never claims to have authoritative feeding plans. It

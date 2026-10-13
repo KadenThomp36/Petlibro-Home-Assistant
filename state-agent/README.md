@@ -13,7 +13,8 @@ TUTK credentials.
 
 The agent:
 
-- reads known files below `/user/data` into one immutable request snapshot;
+- reads each known file below `/user/data` once per request and derives decoded
+  values and revisions from those same buffers;
 - validates exact file sizes before decoding;
 - returns semantic values, optional raw bytes, and stable revisions;
 - classifies decoded fields as `persistent`, `effective_cached`, or `runtime`;
@@ -48,6 +49,13 @@ allowed peers. Principal routes are:
 47-byte records; schedule equality excludes runtime execution and regenerated
 sync metadata. `feed_rec.bin` is a ring of pending 93-byte event slots and must
 not be presented as permanent feed history.
+
+The OEM firmware owns these files and may update them independently. Shape,
+bounds, and semantic validation reject malformed inputs, but the read-only
+agent cannot make a multi-file read atomic or prove that every file belongs to
+one firmware generation. Persistent writes therefore rely on AppDaemon's fresh
+preflight and post-acknowledgement verification rather than a State Agent
+stabilization heuristic.
 
 ## Installation
 

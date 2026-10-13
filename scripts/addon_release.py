@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +21,11 @@ DEVELOPMENT_VERSION_RE = re.compile(
 
 class ReleaseValidationError(ValueError):
     """Raised when a branch and version do not form a valid release channel."""
+
+
+ABSENT_MANIFEST_RE = re.compile(
+    r"(?:^|:\s)(?:not found|manifest unknown(?::.*)?)$", re.IGNORECASE
+)
 
 
 @dataclass(frozen=True)
@@ -69,16 +75,67 @@ def write_github_output(path: Path, metadata: ReleaseMetadata) -> None:
         output.write("\nPETLIBRO_IMAGE_TAGS\n")
 
 
+def ensure_image_tag_available(
+    reference: str,
+    *,
+    run: object = subprocess.run,
+) -> None:
+    """Fail unless a registry lookup definitively reports an absent manifest."""
+    if not reference or ":" not in reference.rsplit("/", 1)[-1]:
+        raise ReleaseValidationError("image tag reference must include a non-empty tag")
+    try:
+        result = run(
+            ["docker", "buildx", "imagetools", "inspect", reference],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as error:
+        raise ReleaseValidationError(f"image tag lookup could not start: {error}") from error
+
+    if result.returncode == 0:
+        raise ReleaseValidationError(
+            f"image tag {reference} already exists; increment addon/config.yaml instead "
+            "of overwriting a release"
+        )
+
+    detail = (result.stderr or result.stdout or "").strip()
+    last_line = detail.splitlines()[-1] if detail else ""
+    if ABSENT_MANIFEST_RE.search(last_line):
+        return
+    raise ReleaseValidationError(
+        f"image tag lookup for {reference} was indeterminate"
+        + (f": {last_line}" if last_line else "")
+    )
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--branch", required=True)
-    parser.add_argument("--version", required=True)
-    parser.add_argument("--github-output", type=Path, required=True)
-    return parser.parse_args(argv)
+    parser.add_argument("--branch")
+    parser.add_argument("--version")
+    parser.add_argument("--github-output", type=Path)
+    parser.add_argument("--check-image-tag")
+    args = parser.parse_args(argv)
+    release_args = (args.branch, args.version, args.github_output)
+    if args.check_image_tag:
+        if any(value is not None for value in release_args):
+            parser.error("--check-image-tag cannot be combined with release metadata options")
+    elif any(value is None for value in release_args):
+        parser.error("--branch, --version, and --github-output are required together")
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.check_image_tag:
+        try:
+            ensure_image_tag_available(args.check_image_tag)
+        except ReleaseValidationError as error:
+            print(f"release validation failed: {error}", file=sys.stderr)
+            return 2
+        print(f"Confirmed image tag is absent: {args.check_image_tag}")
+        return 0
+
     try:
         metadata = release_metadata(args.branch, args.version)
     except ReleaseValidationError as error:

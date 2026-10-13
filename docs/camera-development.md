@@ -64,6 +64,11 @@ Preserve these boundaries when modifying the implementation:
 - Normal and extended media headers feed the same assembly path only after
   structural validation. Rejected candidates must not create false evidence of
   successful assembly.
+- NACKed media may return on AF203's retransmission channels: audio `0x03`
+  becomes `0x04`, key/IDR video `0x05` becomes `0x06`, and inter-frame video
+  `0x07` becomes `0x08`. Classification normalizes only these verified pairs;
+  the packet must still pass its normal layout and payload checks before its
+  sequence contributes to the receive ACK window.
 - Key/IDR-family video (`0x05`), inter-frame video (`0x07`), and audio (`0x03`)
   keep independent frame-assembly state.
 - Bootstrap usually reports AV sequence `0x3fff` before HD media begins at

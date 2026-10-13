@@ -2,6 +2,7 @@ import importlib.util
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -52,6 +53,50 @@ def test_develop_rejects_versions_outside_beta_convention(version):
 def test_unknown_branch_is_rejected():
     with pytest.raises(addon_release.ReleaseValidationError):
         addon_release.release_metadata("feature/example", "0.3.10-beta.1")
+
+
+def inspect_result(returncode, *, stderr="", stdout=""):
+    return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
+
+
+def test_image_tag_lookup_accepts_only_definite_absence():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        return inspect_result(1, stderr="ERROR: ghcr.io/example/addon:1.2.3: not found\n")
+
+    addon_release.ensure_image_tag_available("ghcr.io/example/addon:1.2.3", run=run)
+
+    assert calls[0][0] == [
+        "docker", "buildx", "imagetools", "inspect", "ghcr.io/example/addon:1.2.3"
+    ]
+    assert calls[0][1] == {"capture_output": True, "text": True, "check": False}
+
+
+def test_image_tag_lookup_rejects_existing_tag():
+    with pytest.raises(addon_release.ReleaseValidationError, match="already exists"):
+        addon_release.ensure_image_tag_available(
+            "ghcr.io/example/addon:1.2.3",
+            run=lambda *_args, **_kwargs: inspect_result(0),
+        )
+
+
+@pytest.mark.parametrize(
+    "detail",
+    [
+        "ERROR: denied: denied",
+        "ERROR: failed to do request: dial tcp: network is unreachable",
+        "ERROR: unexpected status from HEAD request: 429 Too Many Requests",
+        "",
+    ],
+)
+def test_image_tag_lookup_fails_closed_on_indeterminate_errors(detail):
+    with pytest.raises(addon_release.ReleaseValidationError, match="indeterminate"):
+        addon_release.ensure_image_tag_available(
+            "ghcr.io/example/addon:1.2.3",
+            run=lambda *_args, **_kwargs: inspect_result(1, stderr=detail),
+        )
 
 
 def test_cli_writes_only_the_development_version_tag(tmp_path):
@@ -116,3 +161,6 @@ def test_workflow_uses_validated_tags_for_both_publish_steps():
     assert "github.repository == 'tannerln7/Petlibro-Home-Assistant'" in workflow
     assert workflow.count("${{ needs.prepare.outputs.image_tags }}") == 2
     assert "${{ needs.prepare.outputs.version }}\n            latest" not in workflow
+    assert 'scripts/addon_release.py --check-image-tag "${IMAGE}:${VERSION}"' in workflow
+    assert "    needs: validate\n" in workflow
+    assert "PYTHON_BIN=.venv/bin/python ./scripts/validate.sh --strict" in workflow

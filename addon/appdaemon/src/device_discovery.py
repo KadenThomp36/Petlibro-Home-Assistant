@@ -623,29 +623,29 @@ class PetlibroDiscovery(ADBase):
         now = utc_now()
         changed = False
         for key, device in self.registry.devices.items():
-            camera_online, unhealthy = self._camera_health(device, now)
+            camera_online = self._camera_online(device, now)
             changed = self.registry.set_camera_online(device, camera_online) or changed
-            if self._resolution_due(device, now, unhealthy):
+            if self._resolution_due(device, now):
                 self._schedule_resolution(key, force=False)
         if changed:
             self._schedule_flush(config_dirty=False)
         else:
             self._publish_all()
 
-    def _camera_health(self, device: dict, now: datetime.datetime) -> tuple[bool, bool]:
+    def _camera_online(self, device: dict, now: datetime.datetime) -> bool:
         stream_name = str(device.get("stream_name", ""))
         if not stream_name:
-            return False, False
+            return False
         try:
             status = json.loads(status_file_for(stream_name).read_text(encoding="utf-8"))
         except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError):
-            return False, False
+            return False
         update = parse_timestamp(status.get("last_update")) if isinstance(status, dict) else None
         stale = update is None or now - update > datetime.timedelta(seconds=90)
         state = status.get("status") if isinstance(status, dict) else None
-        return state == "online" and not stale, state in {"offline", "error"} or stale
+        return state == "online" and not stale
 
-    def _resolution_due(self, device: dict, now: datetime.datetime, unhealthy: bool) -> bool:
+    def _resolution_due(self, device: dict, now: datetime.datetime) -> bool:
         uid = device.get("uid")
         if not isinstance(uid, str) or len(uid) != 20:
             return False
@@ -658,7 +658,7 @@ class PetlibroDiscovery(ADBase):
         expired = last_resolved is None or now - last_resolved >= datetime.timedelta(
             minutes=self.refresh_minutes
         )
-        return not device.get("ip_address") or expired or unhealthy
+        return not device.get("ip_address") or expired
 
     def _schedule_resolution(self, key: str, *, force: bool) -> None:
         if key in self.resolving:
@@ -668,7 +668,7 @@ class PetlibroDiscovery(ADBase):
             return
         if device.get("manual_override") and device.get("ip_address"):
             return
-        if not force and not self._resolution_due(device, utc_now(), False):
+        if not force and not self._resolution_due(device, utc_now()):
             return
         self.resolving.add(key)
         # Give the debounced app-config write time to create the controller;

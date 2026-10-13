@@ -47,8 +47,10 @@ State Agent API.
 
 [`state-agent/`](../state-agent/README.md) is a small C service running beside
 the unchanged OEM firmware. It reads only fixed OEM state files, validates
-their shape, and returns snapshot-consistent decoded state and revisions over
-an authenticated source-IP-restricted HTTP API.
+their shape, and returns decoded state and revisions derived from the same
+per-request buffers over an authenticated source-IP-restricted HTTP API. The
+read-only boundary cannot promise one atomic generation across files that the
+OEM firmware may update independently.
 
 It also accepts one signed, fixed-format agent update upload. A runit supervisor
 performs durable candidate activation, probation, and single-backup rollback.
@@ -121,7 +123,15 @@ not current actuator state.
 The controller learns feeder serial/product identity from MQTT and camera UID
 from `DEVICE_START_EVENT`. Device discovery resolves the current feeder address
 using the UID-specific LAN_SEARCH3/KNOCK2 exchange and writes a private device
-registry. Only resolved devices receive go2rtc stream entries.
+registry. AppDaemon is the registry's persistent owner; the go2rtc renderer
+merges manual overrides only into its in-memory render view so concurrent
+service startup cannot replace newer discovery state. Only resolved devices
+receive go2rtc stream entries.
+
+When registry changes alter `apps.yaml`, AppDaemon's normal one-second utility
+loop observes the atomically replaced file through its app-directory symlink.
+It initializes new device apps, reloads changed definitions, and terminates
+definitions removed from that file; a service restart is not required.
 
 The go2rtc `petlibro://` source opens on demand. Its camera path has three
 responsibility layers:

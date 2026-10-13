@@ -293,7 +293,7 @@ class StateAgentUpdateCoordinator:
         self._status_poll_timer = None
         self._status_poll_attempts = 0
         self._busy = False
-        self._last_check_monotonic = 0.0
+        self._last_check_monotonic: float | None = None
         self._latest_state = UpdateStateSnapshot(
             installed_version="unknown",
             latest_version="unknown",
@@ -339,8 +339,10 @@ class StateAgentUpdateCoordinator:
             )
             return
         now = time.monotonic()
-        if not force and (now - self._last_check_monotonic) < self._minimum_spacing(
-            reason
+        if (
+            not force
+            and self._last_check_monotonic is not None
+            and (now - self._last_check_monotonic) < self._minimum_spacing(reason)
         ):
             self.logger.debug("state-agent update check throttled", reason=reason)
             return

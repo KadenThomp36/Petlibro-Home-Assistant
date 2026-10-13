@@ -1,6 +1,7 @@
 import inspect
 import json
 import struct
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -348,6 +349,12 @@ def test_coordinator_throttle_and_force(monkeypatch, tmp_path: Path):
             check_interval_hours=24,
         ),
         public_key_path=str(key_path),
+    )
+
+    # Simulate a fresh boot with less than 10 minutes of uptime.
+    # The first check must run even when monotonic time is near zero.
+    monkeypatch.setattr(
+        update_module, "time", SimpleNamespace(monotonic=lambda: 5.0)
     )
 
     coordinator.request_check(force=False, reason="connect")

@@ -24,6 +24,9 @@ Both messages use QoS 1 and are retained. `availability` is `online` only when
 the camera runtime status is `online`; every other state maps to `offline`.
 State changes are published within the local polling interval, while unchanged
 state and availability are refreshed at the configured heartbeat interval.
+Here, `online` means the current physical session passed adapter readiness and
+remains open. It does not assert recent video progress, an attached consumer,
+or successful downstream decoding and presentation.
 
 ## State payload
 
@@ -82,12 +85,14 @@ ignore fields they do not recognize so compatible fields can be added later.
 | `hd_transition` | Whether a later SPS reached at least 1920x1080 after a lower initial SPS, and elapsed milliseconds |
 | `rtsp_path` | Stream identifier to append to the configured RTSP listener |
 | `rtsp_url_hint` | Host-neutral display hint; it deliberately contains no LAN address |
-| `last_update` | UTC ISO-8601 timestamp for the latest runtime state observation |
-| `health` | Cumulative counters for the current camera session; `ack_pending` is a gauge |
+| `last_update` | UTC ISO-8601 timestamp for the latest status-writer observation; periodic health writes can advance it without a new media frame |
+| `health` | Cumulative transport/assembler counters for the current camera session; `ack_pending` is a gauge, and unchanged counters do not prove current media progress |
 
 `ffmpeg_errors` is `null` because go2rtc does not run or inspect a downstream
 FFmpeg decoder. The other health fields come directly from the Petlibro media
-assembler and receive-window counters.
+assembler and receive-window counters. Use correlated DEBUG health logs to
+separate transport input, adapter output, and go2rtc receiver progress. Client
+decode and presentation require client-side FFmpeg or browser evidence.
 
 ## Offline and error behavior
 
