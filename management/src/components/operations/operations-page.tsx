@@ -3,13 +3,20 @@ import {
   Activity,
   CheckCircle2,
   CircleAlert,
-  Clock3,
   Play,
   Radio,
   ServerCog,
 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '#/components/layout/application-shell';
+import { OperationList } from '#/components/shared/operation-list';
+import {
+  EmptyState,
+  formatTime,
+  humanize,
+  SectionHeading,
+  StatusBadge,
+} from '#/components/shared/presentation';
 import { Badge } from '#/components/ui/badge';
 import { Button } from '#/components/ui/button';
 import {
@@ -34,6 +41,7 @@ import {
 
 export function OperationsPage() {
   const queryClient = useQueryClient();
+  const [selectedOperationId, setSelectedOperationId] = useState<string>();
   const actionQuery = useQuery({
     queryKey: ['actions', 'state-agent-inspection'],
     queryFn: ({ signal }) => fetchStateAgentInspectionAction(signal),
@@ -46,6 +54,7 @@ export function OperationsPage() {
   const startMutation = useMutation({
     mutationFn: startStateAgentInspection,
     onSuccess: async (operation) => {
+      setSelectedOperationId(operation.operationId);
       await queryClient.invalidateQueries({ queryKey: ['operations'] });
       await queryClient.invalidateQueries({
         queryKey: ['operation', operation.operationId],
@@ -53,7 +62,10 @@ export function OperationsPage() {
     },
   });
 
-  const latestOperation = operationsQuery.data?.[0];
+  const selectedOperation =
+    operationsQuery.data?.find(
+      (operation) => operation.operationId === selectedOperationId,
+    ) ?? operationsQuery.data?.[0];
 
   return (
     <div className="page-stack">
@@ -89,10 +101,28 @@ export function OperationsPage() {
             <CardDescription>{operationsQuery.error.message}</CardDescription>
           </CardHeader>
         </Card>
-      ) : latestOperation === undefined ? (
+      ) : selectedOperation === undefined ? (
         <EmptyOperations />
       ) : (
-        <OperationView operation={latestOperation} />
+        <>
+          <section aria-labelledby="operation-journal-title">
+            <SectionHeading
+              eyebrow="Operation journal"
+              title="Recent work"
+              aside={<span className="section-note">Most recent 20</span>}
+            />
+            <Card id="operation-journal-title" className="operation-list-card">
+              <CardContent>
+                <OperationList
+                  operations={operationsQuery.data}
+                  selectedId={selectedOperation.operationId}
+                  onSelect={setSelectedOperationId}
+                />
+              </CardContent>
+            </Card>
+          </section>
+          <OperationView operation={selectedOperation} />
+        </>
       )}
     </div>
   );
@@ -154,12 +184,10 @@ function EmptyOperations() {
   return (
     <Card className="empty-operation-card">
       <CardContent>
-        <Clock3 aria-hidden="true" />
-        <h2>No recorded operations</h2>
-        <p>
-          Configure the worker and State Agent server settings to exercise the
-          first read-only capability path.
-        </p>
+        <EmptyState
+          title="No recorded operations"
+          description="Configure the worker and State Agent server settings to exercise the first read-only capability path."
+        />
       </CardContent>
     </Card>
   );
@@ -204,7 +232,7 @@ function OperationView({
               </CardTitle>
               <CardDescription>{current.target.label}</CardDescription>
             </div>
-            <OperationStatusBadge status={current.status} />
+            <StatusBadge status={current.status} />
           </div>
         </CardHeader>
         <CardContent>
@@ -375,34 +403,4 @@ function useOperationEvents(
       socket?.close();
     };
   }, [cursorReady, operationId, queryClient, status]);
-}
-
-function OperationStatusBadge({
-  status,
-}: {
-  readonly status: OperationSnapshot['status'];
-}) {
-  if (status === 'succeeded') {
-    return <Badge className="status-ready">Succeeded</Badge>;
-  }
-  if (status === 'failed') {
-    return <Badge variant="destructive">Failed</Badge>;
-  }
-  if (status === 'interrupted' || status === 'indeterminate') {
-    return <Badge className="status-warning">{humanize(status)}</Badge>;
-  }
-  return <Badge variant="outline">{humanize(status)}</Badge>;
-}
-
-function humanize(value: string): string {
-  const text = value.replaceAll(/[._-]+/g, ' ');
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-function formatTime(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(value));
 }

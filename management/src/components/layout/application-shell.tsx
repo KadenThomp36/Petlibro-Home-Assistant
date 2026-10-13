@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { Link, useRouterState } from '@tanstack/react-router';
 import {
   Activity,
   BookOpenText,
   Boxes,
+  BriefcaseBusiness,
   ChevronDown,
   ClipboardList,
   FileClock,
@@ -15,10 +16,12 @@ import {
   Stethoscope,
   Wrench,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { Badge } from '#/components/ui/badge';
+import { fetchOperations } from '#/infrastructure/http/operations-client';
 import { fetchSystemStatus } from '#/infrastructure/http/system-status-client';
 import { cn } from '#/lib/utils';
+import { ThemeToggle } from './theme-toggle';
 
 interface NavigationItem {
   readonly label: string;
@@ -70,6 +73,7 @@ export function ApplicationShell({
 }: {
   readonly children: ReactNode;
 }) {
+  const mobileMenuRef = useRef<HTMLDetailsElement>(null);
   return (
     <div className="app-frame">
       <a className="skip-link" href="#main-content">
@@ -82,31 +86,39 @@ export function ApplicationShell({
         <Navigation />
         <div className="sidebar-foot">
           <Badge className="border-sky-300/20 bg-sky-300/10 text-sky-100">
-            Foundation
+            Local service
           </Badge>
-          <p>Management process only</p>
+          <p>One feeder per add-on</p>
         </div>
       </aside>
 
       <div className="app-workspace">
         <header className="desktop-topbar">
-          <div className="topbar-location">
-            <span>Petlibro Local</span>
-            <strong>Management</strong>
+          <TopbarLocation />
+          <div className="topbar-tools">
+            <ActiveOperationsStatus />
+            <BackendConnectionStatus />
+            <ThemeToggle compact />
           </div>
-          <BackendConnectionStatus />
         </header>
 
         <header className="mobile-header">
           <Brand compact />
-          <details className="mobile-menu">
-            <summary>
-              Menu <ChevronDown aria-hidden="true" />
-            </summary>
-            <nav aria-label="Mobile navigation">
-              <Navigation />
-            </nav>
-          </details>
+          <div className="mobile-tools">
+            <ThemeToggle compact />
+            <details className="mobile-menu" ref={mobileMenuRef}>
+              <summary>
+                Menu <ChevronDown aria-hidden="true" />
+              </summary>
+              <nav aria-label="Mobile navigation">
+                <Navigation
+                  onNavigate={() =>
+                    mobileMenuRef.current?.removeAttribute('open')
+                  }
+                />
+              </nav>
+            </details>
+          </div>
         </header>
 
         <main id="main-content" className="main-content">
@@ -114,6 +126,53 @@ export function ApplicationShell({
         </main>
       </div>
     </div>
+  );
+}
+
+function TopbarLocation() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const item = navigation
+    .flatMap((group) => group.items)
+    .find((entry) => entry.to === pathname);
+  return (
+    <div className="topbar-location">
+      <span>Petlibro Local</span>
+      <strong>{item?.label ?? 'Management'}</strong>
+    </div>
+  );
+}
+
+function ActiveOperationsStatus() {
+  const operationsQuery = useQuery({
+    queryKey: ['operations'],
+    queryFn: ({ signal }) => fetchOperations(signal),
+    refetchInterval: 5_000,
+  });
+  const activeCount =
+    operationsQuery.data?.filter(
+      (operation) =>
+        ![
+          'succeeded',
+          'failed',
+          'cancelled',
+          'interrupted',
+          'indeterminate',
+        ].includes(operation.status),
+    ).length ?? 0;
+  return (
+    <Link
+      className="topbar-jobs"
+      to="/operations"
+      aria-label={`${activeCount} active operations`}
+    >
+      <BriefcaseBusiness aria-hidden="true" />
+      <span>Jobs</span>
+      <Badge variant={activeCount > 0 ? 'default' : 'secondary'}>
+        {activeCount}
+      </Badge>
+    </Link>
   );
 }
 
@@ -156,7 +215,7 @@ function BackendConnectionStatus() {
   );
 }
 
-function Navigation() {
+function Navigation({ onNavigate }: { readonly onNavigate?: () => void }) {
   return (
     <div className="navigation-groups">
       {navigation.map((group) => (
@@ -172,6 +231,7 @@ function Navigation() {
                 activeProps={{
                   className: 'navigation-link navigation-link-active',
                 }}
+                onClick={onNavigate}
               >
                 <item.icon aria-hidden="true" />
                 <span>{item.label}</span>
@@ -214,8 +274,8 @@ export function ConnectionBanner() {
     <div className="connection-banner" role="note">
       <Activity aria-hidden="true" />
       <span>
-        This foundation observes only its own API. Feeder and service health are
-        not connected yet.
+        Status is reported per source. Missing runtime adapters remain unknown;
+        management availability does not imply feeder health.
       </span>
     </div>
   );

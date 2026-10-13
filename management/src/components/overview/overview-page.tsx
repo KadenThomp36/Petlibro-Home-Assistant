@@ -1,17 +1,24 @@
 import { type UseQueryResult, useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import {
   ArrowRight,
   Check,
   CircleOff,
+  ListChecks,
   RefreshCw,
   Server,
   ShieldCheck,
-  Workflow,
 } from 'lucide-react';
 import {
   ConnectionBanner,
   PageHeader,
 } from '#/components/layout/application-shell';
+import { OperationList } from '#/components/shared/operation-list';
+import {
+  AvailabilityBadge,
+  EmptyState,
+  SectionHeading,
+} from '#/components/shared/presentation';
 import { Badge } from '#/components/ui/badge';
 import { Button } from '#/components/ui/button';
 import {
@@ -23,6 +30,7 @@ import {
 } from '#/components/ui/card';
 import { Skeleton } from '#/components/ui/skeleton';
 import type { SystemStatusSnapshot } from '#/domain/system-status';
+import { fetchOperations } from '#/infrastructure/http/operations-client';
 import { fetchSystemStatus } from '#/infrastructure/http/system-status-client';
 
 type SystemStatusQuery = UseQueryResult<SystemStatusSnapshot, Error>;
@@ -32,6 +40,11 @@ export function OverviewPage() {
     queryKey: ['system-status'],
     queryFn: ({ signal }) => fetchSystemStatus(signal),
     refetchInterval: 30_000,
+  });
+  const operationsQuery = useQuery({
+    queryKey: ['operations'],
+    queryFn: ({ signal }) => fetchOperations(signal),
+    refetchInterval: 5_000,
   });
 
   return (
@@ -55,6 +68,26 @@ export function OverviewPage() {
       </PageHeader>
 
       <ConnectionBanner />
+
+      <Card className="first-run-card">
+        <CardContent>
+          <span className="next-boundary-icon" aria-hidden="true">
+            <ListChecks />
+          </span>
+          <div>
+            <p className="eyebrow">Device setup</p>
+            <h2>No device projection is configured</h2>
+            <p>
+              The management application cannot yet identify or summarize a
+              feeder. Review the setup boundary and current foundation readiness
+              without assuming the operational services are healthy.
+            </p>
+          </div>
+          <Button asChild>
+            <Link to="/setup">Review setup</Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <section className="status-grid" aria-label="Foundation status">
         <ManagementStatusCard query={statusQuery} />
@@ -87,32 +120,47 @@ export function OverviewPage() {
       </section>
 
       <section aria-labelledby="integration-boundaries-title">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Integration boundaries</p>
-            <h2 id="integration-boundaries-title">Honest status, by source</h2>
-          </div>
-          <Badge variant="outline">No device data queried</Badge>
-        </div>
+        <SectionHeading
+          eyebrow="Service health"
+          title="Honest status, by source"
+          aside={<Badge variant="outline">No device data queried</Badge>}
+        />
         <IntegrationGrid query={statusQuery} />
       </section>
 
-      <Card className="next-boundary-card">
-        <CardContent>
-          <div className="next-boundary-icon" aria-hidden="true">
-            <Workflow />
-          </div>
-          <div>
-            <p className="eyebrow">Recommended next boundary</p>
-            <h2>Prove one safe, read-only capability path.</h2>
-            <p>
-              Define the job, capability, event, and worker contracts together,
-              then carry a State Agent health inspection through the real local
-              IPC boundary.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <section aria-labelledby="recent-operations-title">
+        <SectionHeading
+          eyebrow="Recent activity"
+          title="Durable operations"
+          aside={
+            <Button asChild size="sm" variant="outline">
+              <Link to="/operations">View all</Link>
+            </Button>
+          }
+        />
+        <Card id="recent-operations-title">
+          <CardContent>
+            {operationsQuery.isError ? (
+              <p className="operation-inline-error" role="alert">
+                {operationsQuery.error.message}
+              </p>
+            ) : operationsQuery.data === undefined ? (
+              <Skeleton className="h-28" />
+            ) : operationsQuery.data.length === 0 ? (
+              <EmptyState
+                title="No operations recorded"
+                description="The available read-only inspection will appear here after it is accepted."
+              >
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/actions">View actions</Link>
+                </Button>
+              </EmptyState>
+            ) : (
+              <OperationList operations={operationsQuery.data} limit={3} />
+            )}
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }
@@ -221,9 +269,7 @@ function IntegrationGrid({ query }: { readonly query: SystemStatusQuery }) {
               <CircleOff aria-hidden="true" />
               <CardTitle>{integration.name}</CardTitle>
             </div>
-            <IntegrationAvailabilityBadge
-              availability={integration.availability}
-            />
+            <AvailabilityBadge availability={integration.availability} />
           </CardHeader>
           <CardContent>
             <p>{integration.detail}</p>
@@ -233,20 +279,6 @@ function IntegrationGrid({ query }: { readonly query: SystemStatusQuery }) {
       ))}
     </div>
   );
-}
-
-function IntegrationAvailabilityBadge({
-  availability,
-}: {
-  readonly availability: SystemStatusSnapshot['integrations'][number]['availability'];
-}) {
-  if (availability === 'ready') {
-    return <Badge className="status-ready">Ready</Badge>;
-  }
-  if (availability === 'unavailable') {
-    return <Badge className="status-warning">Unavailable</Badge>;
-  }
-  return <Badge variant="secondary">Not configured</Badge>;
 }
 
 function formatObservedAt(value: string): string {

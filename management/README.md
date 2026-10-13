@@ -5,7 +5,8 @@ the planned Petlibro Management application. It is independently runnable and
 packaged into the Home Assistant add-on. Existing AppDaemon and go2rtc services
 remain the production operational authorities.
 
-The foundation implements two vertical paths:
+The foundation implements two vertical backend paths and presents their real
+state across the management route inventory:
 
 ```text
 Overview page
@@ -143,7 +144,14 @@ Supervisor remains to be qualified.
 
 Implemented now:
 
-- responsive application shell and the planned top-level route inventory;
+- responsive desktop and narrow/Ingress application shell, route-aware
+  navigation, light/dark browser preference, and active-operation indicator;
+- purpose-built Overview, Devices, Setup, Actions, Operations, Diagnostics,
+  Logs, History, and Settings layouts;
+- honest capability-gap and first-run states for pages whose source adapters or
+  operation contracts have not been migrated;
+- reusable service availability, observation provenance, action availability,
+  operation status/list, execution evidence, and empty-state presentation;
 - accessible loading, API-error, not-found, and reduced-motion behavior;
 - source-aware status contract and response validation;
 - thin versioned HTTP adapter and explicit application-service composition;
@@ -152,12 +160,16 @@ Implemented now:
 - durable operation snapshots and globally sequenced events in SQLite;
 - restart reconciliation without blind capability replay;
 - HTTP operation snapshot/history and reconnectable WebSocket notifications;
-- source-aware Operations UI with success, failure and interruption states;
+- source-aware Operations UI with selectable durable history, success, failure,
+  interruption, result evidence, and cursor-based live updates;
+- operation-backed recent activity on Overview and History, plus the real
+  State Agent inspection capability on Actions and Diagnostics;
 - root and configurable-prefix build configuration;
 - add-on image packaging and independent s6 supervision;
 - Supervisor-source-restricted Ingress gateway and opt-in CIDR-restricted
   direct gateway over the same HTTP/WebSocket backend;
-- unit, contract, and representative UI tests.
+- unit, contract, representative UI, responsive browser, and prefixed-path
+  runtime tests.
 
 Intentionally not implemented:
 

@@ -3,6 +3,12 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OverviewPage } from './overview-page';
 
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
+}));
+
 const snapshot = {
   apiVersion: 'v1',
   generatedAt: '2026-10-13T12:00:00.000Z',
@@ -41,7 +47,17 @@ afterEach(() => {
 
 describe('OverviewPage', () => {
   it('renders management readiness without inventing integration health', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(snapshot)));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        return Promise.resolve(
+          Response.json(
+            url.includes('/operations') ? { operations: [] } : snapshot,
+          ),
+        );
+      }),
+    );
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });

@@ -1003,7 +1003,7 @@ The first end-to-end proof should use a safe read-only capability and the actual
 | One fully designed management application, not a disposable wizard | **Established** | Layout, job model, streams, security and durable state designed from outset |
 | React + TypeScript | **Established** | Shared browser/server type language |
 | TanStack Start SPA + Router + Query | **Implemented foundation** | Packaged Node production, root/prefixed routing and WebSocket behavior validated in a local add-on container; real Supervisor qualification remains |
-| Tailwind + shadcn/ui | **Planned** | Shared component/theming system |
+| Tailwind + shadcn/ui | **Implemented foundation** | Shared tokens, light/dark themes, responsive shell and reusable status/operation/empty-state presentation; continue extending components with real contracts |
 | RJSF/shadcn for generic action forms | **Planned** | Prove schema/validator/conditional/custom-widget compatibility |
 | TanStack Table and Virtual | **Planned** | Responsive tables and large log/event streams |
 | TanStack Charts for telemetry | **Candidate** | Assess current API, update behavior, accessibility and resource fit |
