@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.12-beta.6
+
+- Improve camera runtime-status reporting with session-generation tracking to prevent stale observations from being attributed to newer camera sessions.
+- Improve Home Assistant device discovery consistency, including handling of Home Assistant restarts and MQTT birth notifications.
+- Harden the installer with stricter firmware compatibility checks, preserved recovery snapshots, and safer bootstrap validation.
+- Strengthen release integrity with immutable image tags, fail-closed artifact verification, and mandatory strict CI validation.
+- Add automated live-media testing infrastructure covering WebRTC, RTSP, audio, concurrent consumers, and abrupt disconnects.
+- Expand regression tests, operational documentation, and camera troubleshooting guidance.
+
 ## 0.3.12-beta.5
 
 - Add optional inbound PLAF203 microphone audio, disabled by default
