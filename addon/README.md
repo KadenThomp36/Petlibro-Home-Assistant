@@ -1,12 +1,16 @@
 # Home Assistant add-on
 
 This directory contains the production **Petlibro Local backend** Home
-Assistant add-on. It combines two long-running services in one image:
+Assistant add-on. It combines five independently supervised services in one
+image:
 
 - a Python/AppDaemon controller for the PLAF203 MQTT protocol, Home Assistant
   discovery, commands, telemetry, schedules, and State Agent reconciliation;
 - a maintained go2rtc fork that converts the feeder camera's local Petlibro
   transport into RTSP, WebRTC, and other go2rtc outputs.
+- the Petlibro Management Node application and durable SQLite journal;
+- a private Python device-capability worker; and
+- an Nginx gateway for Home Assistant Ingress and optional direct access.
 
 The add-on is the Home Assistant side of the system. It does not modify feeder
 firmware or install the State Agent. Use the [unified installer](../installer/README.md)
@@ -45,6 +49,7 @@ The add-on's Home Assistant configuration schema is defined in
 - State Agent URL, bearer token, and update policy;
 - feeder discovery and manual overrides;
 - camera stream and protocol tuning; and
+- management direct-access exposure; and
 - logging and bounded diagnostic capture.
 
 See [add-on options](DOCS.md) for the user-facing option reference and
@@ -56,12 +61,17 @@ local ignored configuration file, never in source control.
 
 The image normally exposes:
 
+- `8099/tcp`: management Ingress listener, restricted to the Supervisor proxy;
+- an optional configurable management direct-access TCP port (default `8098`);
 - `1984/tcp`: go2rtc web interface and API;
 - `8554/tcp`: RTSP;
 - `8555/tcp` and `8555/udp`: WebRTC transports.
 
 All services use host networking because feeder discovery and camera setup use
 LAN broadcast/UDP traffic. Do not expose these ports to an untrusted network.
+The management application itself provides neither authentication nor TLS.
+Leave direct access disabled unless its allowed CIDR is a trusted LAN or an
+externally authenticated reverse proxy.
 
 ## Development
 

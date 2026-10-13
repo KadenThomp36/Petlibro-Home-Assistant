@@ -16,6 +16,7 @@ repositories and reverse-engineering workspaces are not source dependencies.
 | `docs/` | Maintained user, architecture, protocol, and development docs |
 | `docker/` | Local Docker Compose deployment |
 | `scripts/` | Build, validation, diagnostics, and stream test helpers |
+| `management/` | Independently runnable React/TypeScript management application foundation |
 
 Tests are colocated with the component they exercise. Shared production code
 belongs in a shared package only when at least two runtime components genuinely
@@ -25,6 +26,7 @@ convenience.
 ## Prerequisites
 
 - Python 3.12 or newer;
+- Node.js 24 and npm, managed by the repository `mise.toml`;
 - Go 1.24 or the version required by `addon/go2rtc/go.mod`;
 - a C99 host compiler;
 - `arm-linux-gnueabihf-gcc`, `git`, GNU Make, `file`, and `readelf` for release
@@ -40,6 +42,13 @@ python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -r addon/appdaemon/requirements-dev.txt
 python -m pip install -r installer/requirements.txt
+```
+
+Install the repository-managed Node runtime and management dependencies:
+
+```bash
+mise install
+(cd management && npm ci)
 ```
 
 Never put broker passwords, feeder credentials, State Agent tokens, signing
@@ -64,6 +73,7 @@ make -C state-agent clean arm-release
 (cd addon/go2rtc && go test ./pkg/petlibro ./cmd/petlibro-resolve)
 (cd addon/go2rtc && go vet ./pkg/petlibro ./cmd/petlibro-resolve)
 docker compose --env-file docker/.env.example -f docker/docker-compose.yml config --quiet
+(cd management && npm run check && npm run typecheck && npm test && npm run build)
 ```
 
 The embedded go2rtc tree retains upstream packages needed to build the binary,
@@ -176,6 +186,40 @@ fill only local values, then use:
 Do not run mutating commands against a feeder unless that operation is the
 explicit purpose of the test. Prefer synthetic protocol fixtures and temporary
 filesystem roots for routine development.
+
+## Management application development
+
+The management application runs independently of the add-on image for routine
+frontend and TypeScript backend work:
+
+```bash
+cd management
+npm run worker # separate terminal; private Unix socket
+npm run dev
+```
+
+The shell and status endpoint run when the worker and operational services are
+absent. A configured worker enables the read-only State Agent inspection path;
+its URL and token are server/worker configuration and never browser inputs. See
+[`management/README.md`](../management/README.md) for source organization,
+commands, environment variables, operation persistence, implemented scope, and
+explicit deferrals.
+
+The production image supervises the management Node process, private Python
+worker, and Nginx gateway independently from AppDaemon and go2rtc. Build the
+integrated image with `./scripts/build-local.sh`; local Compose enables a
+loopback-only direct listener because no Supervisor Ingress proxy is present.
+The application provides no authentication or TLS, so broader direct exposure
+must be limited to a trusted LAN or an externally authenticated reverse proxy.
+A malformed feeder/AppDaemon configuration must not block management startup.
+
+After building `petlibro-local:local`, exercise both access modes, HTTP APIs,
+WebSockets, dynamic Ingress paths, Unix-socket permissions, and journal
+persistence with:
+
+```bash
+./scripts/test-management-runtime.sh
+```
 
 ## Protocol and research workflow
 

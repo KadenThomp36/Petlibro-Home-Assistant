@@ -27,6 +27,30 @@ comment out the `image:` field in `config.yaml` to make Supervisor build the
 Dockerfile. Such builds can consume all available CPU temporarily, particularly
 on Raspberry Pi-class and other low-resource installations.
 
+## Management access
+
+Home Assistant Ingress is always enabled on the internal `8099/tcp` listener.
+That listener accepts only the Supervisor Ingress proxy source address. The
+application, HTTP APIs, and WebSockets use the same Node backend in both access
+modes.
+
+| Option                           | Default          | Description                                                        |
+| -------------------------------- | ---------------- | ------------------------------------------------------------------ |
+| `management_direct_access`       | `false`          | Also expose the management gateway directly on the host network    |
+| `management_direct_port`         | `8098`           | Direct gateway TCP port; must not collide with Ingress or go2rtc   |
+| `management_direct_allowed_cidr` | `192.168.1.0/24` | IPv4 source network allowed to connect to the direct gateway       |
+
+Petlibro Management does not implement authentication or TLS. Keep direct
+access disabled for Ingress-only operation. If enabled, restrict the CIDR to a
+trusted LAN or to an externally authenticated reverse proxy. A reverse proxy
+that publishes the app below a prefix may send `X-Forwarded-Prefix`; it must
+replace client-supplied forwarding headers and provide authentication itself.
+Never expose the direct port to the Internet.
+
+The Node HTTP server and Python worker listen only on private Unix sockets.
+Management state is stored under `/data/management`; feeder configuration
+errors do not prevent the management services from starting.
+
 ## Discovery-first setup
 
 | Option                                | Default          | Description                                                                         |

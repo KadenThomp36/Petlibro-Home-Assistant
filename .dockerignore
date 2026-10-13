@@ -9,6 +9,9 @@
 **/.tox
 **/.nox
 **/*.egg-info
+**/node_modules
+**/.output
+**/.data
 
 build
 dist

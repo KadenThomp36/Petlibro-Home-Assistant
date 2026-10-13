@@ -26,6 +26,9 @@ class RenderConfigTests(unittest.TestCase):
 
         self.assertIn("image: ghcr.io/tannerln7/ha-addon-petlibro-local\n", manifest)
         self.assertIn("arch:\n  - amd64\n", manifest)
+        self.assertIn("ingress: true\n", manifest)
+        self.assertIn("ingress_port: 8099\n", manifest)
+        self.assertIn("  management_direct_access: false\n", manifest)
 
     def test_state_agent_manifest_default_matches_signed_release_feed(self):
         expected = (
@@ -125,6 +128,133 @@ class RenderConfigTests(unittest.TestCase):
                 options, data_dir, TEMPLATES
             )
         return go2rtc_changed, appdaemon_changed
+
+    def test_renders_private_management_runtime_and_ingress_only_by_default(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data_dir = root / "data"
+            runtime_dir = root / "run"
+            data_dir.mkdir()
+            options = self.options()
+            options["petlibro_state_agent_url"] = "http://192.0.2.100:8765"
+            options["petlibro_state_agent_token"] = "management-secret-token"
+            (data_dir / "options.json").write_text(json.dumps(options))
+
+            with patch.dict(
+                os.environ,
+                {"PETLIBRO_MANAGEMENT_RUNTIME_DIR": str(runtime_dir)},
+                clear=True,
+            ):
+                warnings = render_config.render_management_runtime(
+                    data_dir, TEMPLATES
+                )
+
+            self.assertEqual([], warnings)
+            nginx = (runtime_dir / "nginx.conf").read_text()
+            self.assertIn("listen 0.0.0.0:8099;", nginx)
+            self.assertIn("allow 172.30.32.2/32;", nginx)
+            self.assertIn(
+                "rewrite ^ /__PETLIBRO_BASE__$uri break;", nginx
+            )
+            self.assertIn("location ^~ /api/", nginx)
+            self.assertNotIn("listen 0.0.0.0:8098;", nginx)
+            self.assertNotIn("management-secret-token", nginx)
+            self.assertEqual(
+                "management-secret-token",
+                (runtime_dir / "state-agent-token").read_text(),
+            )
+            self.assertEqual(
+                "http://192.0.2.100:8765",
+                (runtime_dir / "env" / "PETLIBRO_STATE_AGENT_URL").read_text(),
+            )
+            self.assertEqual(
+                0o700, (data_dir / "management").stat().st_mode & 0o777
+            )
+            self.assertEqual(
+                0o600,
+                (runtime_dir / "state-agent-token").stat().st_mode & 0o777,
+            )
+
+    def test_renders_opt_in_source_restricted_direct_management_listener(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data_dir = root / "data"
+            runtime_dir = root / "run"
+            data_dir.mkdir()
+            options = self.options()
+            options.update(
+                management_direct_access=True,
+                management_direct_port=18443,
+                management_direct_allowed_cidr="10.20.30.0/24",
+            )
+            (data_dir / "options.json").write_text(json.dumps(options))
+
+            with patch.dict(
+                os.environ,
+                {"PETLIBRO_MANAGEMENT_RUNTIME_DIR": str(runtime_dir)},
+                clear=True,
+            ):
+                warnings = render_config.render_management_runtime(
+                    data_dir, TEMPLATES
+                )
+
+            self.assertEqual([], warnings)
+            nginx = (runtime_dir / "nginx.conf").read_text()
+            self.assertIn("listen 0.0.0.0:18443;", nginx)
+            self.assertIn("allow 10.20.30.0/24;", nginx)
+            self.assertIn("$petlibro_direct_base", nginx)
+
+    def test_direct_listener_cannot_reuse_overridden_ingress_port(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data_dir = root / "data"
+            runtime_dir = root / "run"
+            data_dir.mkdir()
+            options = self.options()
+            options.update(
+                management_direct_access=True,
+                management_direct_port=18443,
+                management_direct_allowed_cidr="127.0.0.1/32",
+            )
+            (data_dir / "options.json").write_text(json.dumps(options))
+
+            with patch.dict(
+                os.environ,
+                {
+                    "PETLIBRO_MANAGEMENT_RUNTIME_DIR": str(runtime_dir),
+                    "PETLIBRO_INGRESS_PORT": "18443",
+                },
+                clear=True,
+            ):
+                warnings = render_config.render_management_runtime(
+                    data_dir, TEMPLATES
+                )
+
+            self.assertTrue(any("disabled" in warning for warning in warnings))
+            nginx = (runtime_dir / "nginx.conf").read_text()
+            self.assertEqual(1, nginx.count("listen 0.0.0.0:18443;"))
+
+    def test_invalid_management_options_do_not_block_ingress_startup(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data_dir = root / "data"
+            runtime_dir = root / "run"
+            data_dir.mkdir()
+            (data_dir / "options.json").write_text("not-json", encoding="utf-8")
+
+            with patch.dict(
+                os.environ,
+                {"PETLIBRO_MANAGEMENT_RUNTIME_DIR": str(runtime_dir)},
+                clear=True,
+            ):
+                warnings = render_config.render_management_runtime(
+                    data_dir, TEMPLATES
+                )
+
+            self.assertTrue(warnings)
+            nginx = (runtime_dir / "nginx.conf").read_text()
+            self.assertIn("listen 0.0.0.0:8099;", nginx)
+            self.assertNotIn("listen 0.0.0.0:8098;", nginx)
 
     def test_renders_all_runtime_module_links(self):
         with tempfile.TemporaryDirectory() as temporary:

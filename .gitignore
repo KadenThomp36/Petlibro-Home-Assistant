@@ -30,6 +30,7 @@ htmlcov/
 # Build and runtime output
 /build/
 dist/
+dist-ssr/
 tmp/
 *.dat
 *.tar.gz
@@ -39,6 +40,21 @@ docker/data/
 /state-agent/build/
 /addon/go2rtc/go2rtc
 /addon/go2rtc/petlibro-resolve
+
+# Node and management application output
+node_modules/
+.output/
+.nitro/
+.tanstack/
+.vite/
+.vinxi/
+.wrangler/
+.data/
+coverage/
+*.tsbuildinfo
+*.local
+__unconfig*
+todos.json
 
 # Local configuration and secrets
 **/go2rtc.yaml

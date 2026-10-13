@@ -12,7 +12,7 @@ export NO_PROXY="127.0.0.1,localhost${NO_PROXY:+,${NO_PROXY}}"
 export no_proxy="127.0.0.1,localhost${no_proxy:+,${no_proxy}}"
 
 mapfile -t python_sources < <(
-    find addon installer scripts state-agent/tests \
+    find addon installer management/worker scripts state-agent/tests \
         -type f -name '*.py' \
         -not -path '*/__pycache__/*' \
         -print | sort
@@ -20,10 +20,27 @@ mapfile -t python_sources < <(
 "${python_bin}" -m py_compile "${python_sources[@]}"
 "${python_bin}" scripts/check-doc-links.py
 
+if ! command -v npm >/dev/null 2>&1; then
+    printf 'npm is required for management validation; run mise install\n' >&2
+    exit 1
+fi
+if [[ ! -d management/node_modules ]]; then
+    printf 'Management dependencies are missing; run (cd management && npm ci)\n' >&2
+    exit 1
+fi
+(
+    cd management
+    npm run check
+    npm run typecheck
+    npm test
+    npm run build
+)
+
 "${python_bin}" -m pytest \
     addon/tests \
     state-agent/tests \
     installer/tests \
+    management/worker/tests \
     -q
 
 if "${python_bin}" -c 'import appdaemon' >/dev/null 2>&1; then

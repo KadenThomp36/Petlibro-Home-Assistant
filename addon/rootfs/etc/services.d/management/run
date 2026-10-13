@@ -1,0 +1,15 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+/usr/local/bin/petlibro-local-run management
+
+http_dir=/run/petlibro-management-http
+socket_path="${http_dir}/management.sock"
+install -d -m 2770 -o root -g nginx "${http_dir}"
+rm -f -- "${socket_path}"
+umask 0007
+
+bashio::log.info "Starting Petlibro Management application"
+exec s6-envdir /run/petlibro-management/env \
+    /usr/local/bin/node /opt/petlibro-management/server/index.mjs

@@ -11,6 +11,9 @@ boot: auto
 stage: experimental
 init: false
 host_network: true
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:paw
 webui: http://[HOST]:[PORT:1984]/
 watchdog: http://[HOST]:[PORT:1984]/
 ports:
@@ -63,6 +66,9 @@ options:
   verbose_logs: false
   camera_protocol_tracing: false
   enable_debug_dumps: false
+  management_direct_access: false
+  management_direct_port: 8098
+  management_direct_allowed_cidr: 192.168.1.0/24
 schema:
   mqtt_host: str
   mqtt_port: port
@@ -108,3 +114,6 @@ schema:
   verbose_logs: bool
   camera_protocol_tracing: bool
   enable_debug_dumps: bool
+  management_direct_access: bool
+  management_direct_port: port
+  management_direct_allowed_cidr: str

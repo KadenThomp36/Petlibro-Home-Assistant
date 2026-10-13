@@ -1,0 +1,12 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+socket_dir=/run/petlibro-management/worker
+install -d -m 0700 -o root -g root "${socket_dir}"
+rm -f -- "${socket_dir}/worker.sock"
+umask 0077
+
+bashio::log.info "Starting Petlibro Management capability worker"
+exec python3 /opt/petlibro-local/management-worker/run.py \
+    --socket "${socket_dir}/worker.sock"

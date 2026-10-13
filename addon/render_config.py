@@ -18,6 +18,8 @@ DEFAULT_STATE_AGENT_MANIFEST_URL = (
     "https://raw.githubusercontent.com/tannerln7/Petlibro-Home-Assistant/"
     "state-agent-releases/state-agent/latest.json"
 )
+MANAGEMENT_CLIENT_BASE_SENTINEL = "/__PETLIBRO_BASE__"
+DEFAULT_INGRESS_ALLOW = "172.30.32.2/32"
 
 DEFAULTS = {
     "mqtt_host": "core-mosquitto",
@@ -60,6 +62,9 @@ DEFAULTS = {
     "verbose_logs": False,
     "camera_protocol_tracing": False,
     "enable_debug_dumps": False,
+    "management_direct_access": False,
+    "management_direct_port": 8098,
+    "management_direct_allowed_cidr": "192.168.1.0/24",
 }
 
 ENV_KEYS = {key: key.upper() for key in DEFAULTS}
@@ -79,6 +84,7 @@ BOOL_KEYS = {
     "verbose_logs",
     "camera_protocol_tracing",
     "enable_debug_dumps",
+    "management_direct_access",
 }
 INT_KEYS = {
     "mqtt_port",
@@ -93,6 +99,7 @@ INT_KEYS = {
     "go2rtc_rtsp_port",
     "go2rtc_webrtc_port",
     "camera_metadata_interval_seconds",
+    "management_direct_port",
 }
 
 
@@ -354,6 +361,265 @@ def atomic_write(path: Path, content: str, mode: int = 0o600) -> bool:
 def render_template(template_dir: Path, name: str, values: dict[str, str]) -> str:
     source = (template_dir / name).read_text(encoding="utf-8")
     return Template(source).substitute(values)
+
+
+def _management_raw_options(data_dir: Path) -> tuple[dict[str, object], list[str]]:
+    options_path = data_dir / "options.json"
+    if options_path.is_file():
+        try:
+            value = json.loads(options_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}, ["options.json could not be read; safe management defaults are active"]
+        if not isinstance(value, dict):
+            return {}, ["options.json is not an object; safe management defaults are active"]
+        return value, []
+    return (
+        {
+            key: os.environ[environment_name]
+            for key, environment_name in ENV_KEYS.items()
+            if environment_name in os.environ
+        },
+        [],
+    )
+
+
+def _management_url(value: object) -> str:
+    candidate = str(value).strip()
+    if not candidate or "{" in candidate or "}" in candidate:
+        return ""
+    parsed = urlsplit(candidate)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        return ""
+    return candidate.rstrip("/")
+
+
+def _ipv4_network(value: object, name: str) -> str:
+    try:
+        network = ipaddress.ip_network(str(value), strict=False)
+    except ValueError as err:
+        raise ValueError(f"{name} must be an IPv4 address or CIDR") from err
+    if network.version != 4:
+        raise ValueError(f"{name} must be an IPv4 address or CIDR")
+    return str(network)
+
+
+def _management_proxy_settings(indent: str = "    ") -> str:
+    settings = """proxy_pass http://petlibro_management;
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $http_host;
+    proxy_set_header X-Forwarded-Proto $petlibro_forwarded_proto;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $petlibro_connection_upgrade;
+    proxy_buffering off;
+    proxy_read_timeout 3600s;
+    sub_filter '""" + MANAGEMENT_CLIENT_BASE_SENTINEL + """' $petlibro_response_base;
+    sub_filter_once off;
+    sub_filter_types text/css application/javascript text/javascript;"""
+    return "\n".join(f"{indent}{line.strip()}" for line in settings.splitlines())
+
+
+def _management_proxy_location() -> str:
+    settings = _management_proxy_settings()
+    client_base = MANAGEMENT_CLIENT_BASE_SENTINEL
+    return f"""  location ^~ /api/ {{
+{settings}
+  }}
+
+  location ^~ /assets/ {{
+{settings}
+  }}
+
+  location = /favicon.svg {{
+{settings}
+  }}
+
+  location / {{
+    rewrite ^ {client_base}$uri break;
+{settings}
+  }}"""
+
+
+def render_management_runtime(
+    data_dir: Path, template_dir: Path
+) -> list[str]:
+    """Render a safe management runtime without depending on feeder config validity."""
+
+    raw, warnings = _management_raw_options(data_dir)
+    runtime_dir = Path(
+        os.environ.get(
+            "PETLIBRO_MANAGEMENT_RUNTIME_DIR", "/run/petlibro-management"
+        )
+    )
+    management_data_dir = data_dir / "management"
+    environment_dir = runtime_dir / "env"
+    worker_socket = runtime_dir / "worker" / "worker.sock"
+    application_socket = Path(
+        os.environ.get(
+            "PETLIBRO_MANAGEMENT_HTTP_SOCKET",
+            "/run/petlibro-management-http/management.sock",
+        )
+    )
+    token_file = runtime_dir / "state-agent-token"
+
+    for directory in (runtime_dir, environment_dir, management_data_dir):
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(directory, 0o700)
+
+    state_agent_url = _management_url(
+        raw.get(
+            "petlibro_state_agent_url",
+            os.environ.get("PETLIBRO_STATE_AGENT_URL", ""),
+        )
+    )
+    raw_state_agent_url = str(raw.get("petlibro_state_agent_url", "")).strip()
+    if raw_state_agent_url and not state_agent_url:
+        warnings.append(
+            "State Agent inspection is unavailable until a concrete safe URL is configured"
+        )
+
+    token = raw.get(
+        "petlibro_state_agent_token",
+        os.environ.get("PETLIBRO_STATE_AGENT_TOKEN", ""),
+    )
+    if not isinstance(token, str):
+        token = ""
+        warnings.append("State Agent inspection token has an invalid type")
+    atomic_write(token_file, token, mode=0o600)
+
+    try:
+        timeout_seconds = int(
+            raw.get(
+                "petlibro_state_agent_timeout_seconds",
+                os.environ.get("PETLIBRO_STATE_AGENT_TIMEOUT_SECONDS", 2),
+            )
+        )
+        if not 1 <= timeout_seconds <= 10:
+            raise ValueError
+    except (TypeError, ValueError):
+        timeout_seconds = 2
+        warnings.append("State Agent timeout is invalid; using two seconds")
+
+    try:
+        ingress_allow = _ipv4_network(
+            os.environ.get("PETLIBRO_INGRESS_ALLOW", DEFAULT_INGRESS_ALLOW),
+            "PETLIBRO_INGRESS_ALLOW",
+        )
+        ingress_port = int(os.environ.get("PETLIBRO_INGRESS_PORT", "8099"))
+        if not 1024 <= ingress_port <= 65535:
+            raise ValueError("PETLIBRO_INGRESS_PORT must be between 1024 and 65535")
+    except (TypeError, ValueError) as err:
+        ingress_allow = DEFAULT_INGRESS_ALLOW
+        ingress_port = 8099
+        warnings.append(f"Invalid Ingress override ignored: {err}")
+
+    try:
+        direct_access = parse_bool(
+            raw.get(
+                "management_direct_access",
+                os.environ.get("MANAGEMENT_DIRECT_ACCESS", False),
+            ),
+            "management_direct_access",
+        )
+    except ValueError:
+        direct_access = False
+        warnings.append("Direct management access is invalid and remains disabled")
+
+    direct_port = 8098
+    direct_cidr = ""
+    if direct_access:
+        try:
+            direct_port = int(
+                raw.get(
+                    "management_direct_port",
+                    os.environ.get("MANAGEMENT_DIRECT_PORT", 8098),
+                )
+            )
+            reserved_ports = {1984, ingress_port, 8554, 8555}
+            for key in (
+                "go2rtc_api_port",
+                "go2rtc_rtsp_port",
+                "go2rtc_webrtc_port",
+            ):
+                try:
+                    reserved_ports.add(int(raw.get(key, DEFAULTS[key])))
+                except (TypeError, ValueError):
+                    pass
+            if not 1024 <= direct_port <= 65535 or direct_port in reserved_ports:
+                raise ValueError("port is unavailable or reserved")
+            direct_cidr = _ipv4_network(
+                raw.get(
+                    "management_direct_allowed_cidr",
+                    os.environ.get(
+                        "MANAGEMENT_DIRECT_ALLOWED_CIDR", "192.168.1.0/24"
+                    ),
+                ),
+                "management_direct_allowed_cidr",
+            )
+        except (TypeError, ValueError) as err:
+            direct_access = False
+            warnings.append(f"Direct management access remains disabled: {err}")
+
+    environment = {
+        "NITRO_UNIX_SOCKET": str(application_socket),
+        "PETLIBRO_MANAGEMENT_DATA_DIR": str(management_data_dir),
+        "PETLIBRO_WORKER_SOCKET": str(worker_socket),
+        "PETLIBRO_STATE_AGENT_TOKEN_FILE": str(token_file),
+        "PETLIBRO_STATE_AGENT_TIMEOUT_SECONDS": str(timeout_seconds),
+    }
+    if state_agent_url:
+        environment["PETLIBRO_STATE_AGENT_URL"] = state_agent_url
+    for name in (
+        "NITRO_UNIX_SOCKET",
+        "PETLIBRO_MANAGEMENT_DATA_DIR",
+        "PETLIBRO_WORKER_SOCKET",
+        "PETLIBRO_STATE_AGENT_TOKEN_FILE",
+        "PETLIBRO_STATE_AGENT_TIMEOUT_SECONDS",
+        "PETLIBRO_STATE_AGENT_URL",
+    ):
+        path = environment_dir / name
+        if name in environment:
+            atomic_write(path, environment[name], mode=0o600)
+        else:
+            path.unlink(missing_ok=True)
+
+    proxy_location = _management_proxy_location()
+    direct_server = ""
+    if direct_access:
+        direct_server = f"""
+server {{
+  listen 0.0.0.0:{direct_port};
+  allow {direct_cidr};
+  deny all;
+  set $petlibro_response_base $petlibro_direct_base;
+{proxy_location}
+}}
+"""
+    nginx = render_template(
+        template_dir,
+        "management-nginx.conf.tmpl",
+        {
+            "INGRESS_PORT": str(ingress_port),
+            "INGRESS_ALLOW": ingress_allow,
+            "PROXY_LOCATION": proxy_location,
+            "DIRECT_SERVER": direct_server,
+        },
+    )
+    atomic_write(runtime_dir / "nginx.conf", nginx, mode=0o600)
+    atomic_write(
+        runtime_dir / "configuration-warnings",
+        "\n".join(warnings) + ("\n" if warnings else ""),
+        mode=0o600,
+    )
+    return warnings
 
 
 def stream_name_for(product: str, serial: str, preferred: str = "") -> str:
@@ -863,7 +1129,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "component",
-        choices=("all", "go2rtc", "appdaemon"),
+        choices=("all", "go2rtc", "appdaemon", "management"),
         nargs="?",
         default="all",
     )
@@ -876,6 +1142,10 @@ def main() -> int:
     data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
 
     try:
+        if args.component == "management":
+            for warning in render_management_runtime(data_dir, template_dir):
+                print(f"Petlibro Management configuration warning: {warning}", file=sys.stderr)
+            return 0
         options = load_options(data_dir)
         validate(options)
         if args.component in {"all", "go2rtc"}:

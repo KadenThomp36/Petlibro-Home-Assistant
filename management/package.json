@@ -1,0 +1,70 @@
+{
+  "name": "petlibro-management",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "dev": "vite dev --port 3000",
+    "worker": "python3 worker/run.py",
+    "generate-routes": "tsr generate",
+    "build": "vite build",
+    "start": "node .output/server/index.mjs",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:worker": "python3 -m pytest worker/tests -q",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.5.0",
+    "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-devtools": "0.10.13",
+    "@tanstack/react-query": "5.104.2",
+    "@tanstack/react-query-devtools": "5.104.2",
+    "@tanstack/react-router": "1.170.44",
+    "@tanstack/react-router-devtools": "1.167.2",
+    "@tanstack/react-router-ssr-query": "1.167.3",
+    "@tanstack/react-start": "1.169.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "crossws": "0.4.15",
+    "lucide-react": "^0.577.0",
+    "nitro": "3.0.260610-beta",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "srvx": "0.11.22",
+    "tailwind-merge": "^3.0.2",
+    "tailwindcss": "^4.1.18",
+    "tw-animate-css": "^1.3.6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.5",
+    "@tanstack/devtools-vite": "0.8.5",
+    "@tanstack/router-cli": "^1.132.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "jsdom": "^30.1.2",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "lightningcss"
+    ]
+  }
+}

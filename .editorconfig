@@ -11,5 +11,8 @@ indent_size = 4
 [*.{json,jsonc,yaml,yml,md}]
 indent_size = 2
 
+[management/**/*.{ts,tsx,css}]
+indent_size = 2
+
 [Makefile]
 indent_style = tab

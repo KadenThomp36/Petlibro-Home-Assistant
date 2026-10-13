@@ -10,7 +10,17 @@ from urllib.parse import unquote
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXCLUDED_PARTS = {".git", ".venv", "__pycache__", ".pytest_cache", "build"}
+EXCLUDED_PARTS = {
+    ".git",
+    ".output",
+    ".pytest_cache",
+    ".tanstack",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "node_modules",
+}
 LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 HEADING_RE = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$", re.MULTILINE)
 

@@ -45,5 +45,12 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       VERBOSE_LOGS: ${VERBOSE_LOGS:-0}
       ENABLE_DEBUG_DUMPS: ${ENABLE_DEBUG_DUMPS:-0}
+      # Local Compose has no Home Assistant Ingress proxy, so direct access is
+      # enabled by default and restricted to the local machine.
+      MANAGEMENT_DIRECT_ACCESS: ${MANAGEMENT_DIRECT_ACCESS:-1}
+      MANAGEMENT_DIRECT_PORT: ${MANAGEMENT_DIRECT_PORT:-8098}
+      MANAGEMENT_DIRECT_ALLOWED_CIDR: ${MANAGEMENT_DIRECT_ALLOWED_CIDR:-127.0.0.1/32}
+      PETLIBRO_INGRESS_ALLOW: ${PETLIBRO_INGRESS_ALLOW:-127.0.0.1/32}
+      PETLIBRO_INGRESS_PORT: ${PETLIBRO_INGRESS_PORT:-8099}
     volumes:
       - ./data:/data

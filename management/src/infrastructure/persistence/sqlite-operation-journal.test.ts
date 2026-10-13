@@ -1,0 +1,63 @@
+// @vitest-environment node
+
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  type OperationSnapshot,
+  STATE_AGENT_INSPECTION_ACTION_ID,
+  STATE_AGENT_INSPECTION_CAPABILITY_ID,
+} from '#/domain/operations';
+import { SqliteOperationJournal } from './sqlite-operation-journal';
+
+const temporaryDirectories: string[] = [];
+
+afterEach(() => {
+  for (const directory of temporaryDirectories.splice(0)) {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+describe('SqliteOperationJournal', () => {
+  it('persists operation snapshots and deduplicates replayed source events', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'petlibro-journal-'));
+    temporaryDirectories.push(directory);
+    const databasePath = join(directory, 'operations.sqlite');
+    const first = new SqliteOperationJournal(databasePath);
+    const operation = snapshot();
+    const event = {
+      sourceEventKey: `management:${operation.operationId}:accepted`,
+      operationId: operation.operationId,
+      type: 'operation.accepted',
+      source: 'management-application' as const,
+      severity: 'info' as const,
+      occurredAt: operation.createdAt,
+      payload: { stage: 'queued' },
+    };
+    first.create(operation, [event]);
+    first.update({ ...operation, stage: 'queued-again' }, [event]);
+    first.close();
+
+    const reopened = new SqliteOperationJournal(databasePath);
+    expect(reopened.get(operation.operationId)?.stage).toBe('queued-again');
+    expect(reopened.eventsAfter(operation.operationId, 0, 10)).toHaveLength(1);
+    expect(reopened.listNonTerminal()).toHaveLength(1);
+    reopened.close();
+  });
+});
+
+function snapshot(): OperationSnapshot {
+  return {
+    operationId: 'b7a647e6-40e1-4f60-ae67-a4e9af687684',
+    invocationId: '60de899f-32c2-4590-a631-b67a80307dcc',
+    actionId: STATE_AGENT_INSPECTION_ACTION_ID,
+    capabilityId: STATE_AGENT_INSPECTION_CAPABILITY_ID,
+    target: { kind: 'state-agent', label: '192.0.2.1' },
+    status: 'accepted',
+    stage: 'queued',
+    createdAt: '2026-10-13T12:00:00.000Z',
+    updatedAt: '2026-10-13T12:00:00.000Z',
+    lastWorkerEventSequence: 0,
+  };
+}

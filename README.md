@@ -31,6 +31,7 @@ with Petlibro.
 | [`state-agent/`](state-agent/) | Authenticated feeder-resident service that decodes persistent state and stages signed State Agent updates |
 | [`installer/`](installer/) | Guided no-UART bootstrap that migrates an already claimed stock feeder to the local architecture |
 | [`docker/`](docker/) | Docker Compose deployment for Linux hosts outside Home Assistant OS |
+| [`management/`](management/) | Packaged React/TypeScript management application, durable operation journal, and private Python capability worker |
 
 The add-on is the long-running coordinator. The State Agent does not replace the
 OEM firmware: it runs beside it and exposes only narrowly defined local files.
@@ -171,6 +172,7 @@ Camera sessions are lazy and begin when a consumer opens the generated stream.
 - [Contributing](CONTRIBUTING.md)
 - [Camera backend development](docs/camera-development.md)
 - [Camera diagnostics](docs/camera-debugging.md)
+- [Management application foundation](management/README.md)
 - [Sanitized firmware 3.1.48 MQTT protocol reference](docs/protocol/mqtt-firmware-3.1.48.md)
 
 ## Security and privacy

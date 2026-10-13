@@ -1,0 +1,9 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+/usr/local/bin/petlibro-local-run management
+
+bashio::log.info "Starting Petlibro Management Ingress/direct gateway"
+/usr/sbin/nginx -t -c /run/petlibro-management/nginx.conf
+exec /usr/sbin/nginx -c /run/petlibro-management/nginx.conf -g 'daemon off;'
