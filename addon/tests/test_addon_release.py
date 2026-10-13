@@ -220,6 +220,8 @@ def test_workflow_uses_validated_tags_for_both_publish_steps():
     assert 'scripts/addon_release.py --check-image-tag "${IMAGE}:${VERSION}"' in workflow
     assert "    needs: validate\n" in workflow
     assert "PYTHON_BIN=.venv/bin/python ./scripts/validate.sh --strict" in workflow
+    assert "node-version: 24.21.0" in workflow
+    assert "npm ci --prefix management" in workflow
     assert "release_target:" in workflow
     assert "management-test" in workflow
     assert '[[ "$RELEASE_BRANCH" != feature/management-app-foundation ]]' in workflow

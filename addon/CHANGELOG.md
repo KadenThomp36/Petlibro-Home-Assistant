@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.13-mgmt.1
+## 0.3.13-mgmt.2
 
 - Add the Petlibro Management browser application, TypeScript API, durable
   SQLite operation journal, reconnectable WebSocket updates, and independently
@@ -19,6 +19,13 @@
 - Publish this management qualification build only from
   `feature/management-app-foundation` under an immutable `-mgmt.N` image tag;
   it does not update `latest` or either established release channel.
+
+## 0.3.13-mgmt.1
+
+- Tagged source only; no add-on image was published because validation stopped
+  before the build when the initial manual workflow lacked management npm
+  dependency installation. The tag remains immutable and is superseded by
+  `0.3.13-mgmt.2`.
 
 ## 0.3.12-beta.7
 

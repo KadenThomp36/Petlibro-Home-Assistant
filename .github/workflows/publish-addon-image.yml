@@ -63,6 +63,13 @@ jobs:
               ;;
           esac
 
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: management/package-lock.json
+
       - name: Install strict validation dependencies
         run: |
           sudo apt-get update
@@ -70,6 +77,7 @@ jobs:
           python3 -m venv .venv
           .venv/bin/python -m pip install -r addon/appdaemon/requirements-dev.txt
           .venv/bin/python -m pip install -r installer/requirements.txt
+          npm ci --prefix management
 
       - name: Run strict repository validation
         run: PYTHON_BIN=.venv/bin/python ./scripts/validate.sh --strict
