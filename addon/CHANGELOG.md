@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.12-beta.7
+
+- Restore PLAF203 ACK recovery by recognizing the firmware's retransmission
+  channels for audio, keyframe, and inter-frame media while retaining full
+  packet validation before receive-ACK accounting.
+- Add capture-backed regression coverage for ACK gap closure, cumulative
+  advancement, duplicate and late retransmissions, extended media layouts, and
+  malformed-packet rejection. Physical-hardware validation remains pending.
+
 ## 0.3.12-beta.6
 
 - Improve camera runtime-status reporting with session-generation tracking to prevent stale observations from being attributed to newer camera sessions.

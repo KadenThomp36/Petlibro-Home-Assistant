@@ -66,6 +66,8 @@ capture/
 /research/
 /reverse-engineering/
 /camera-testing/
+/docs/plaf203-onset-*
+/docs/plaf203_capture_forensic_report_*.md
 *.pcap.zst
 *.pcapng.zst
 *.gpr
