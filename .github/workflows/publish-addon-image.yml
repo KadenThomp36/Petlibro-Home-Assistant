@@ -11,6 +11,15 @@ on:
       - scripts/addon_release.py
       - state-agent/release-public-key.hex
   workflow_dispatch:
+    inputs:
+      release_target:
+        description: Release channel permitted for the selected branch
+        required: true
+        default: repository-channel
+        type: choice
+        options:
+          - repository-channel
+          - management-test
 
 permissions:
   contents: read
@@ -27,6 +36,32 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate manual release target
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RELEASE_BRANCH: ${{ github.ref_name }}
+          RELEASE_TARGET: ${{ inputs.release_target }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_TARGET" in
+            repository-channel)
+              if [[ "$RELEASE_BRANCH" != main && "$RELEASE_BRANCH" != develop ]]; then
+                echo "::error::repository-channel requires main or develop"
+                exit 1
+              fi
+              ;;
+            management-test)
+              if [[ "$RELEASE_BRANCH" != feature/management-app-foundation ]]; then
+                echo "::error::management-test requires feature/management-app-foundation"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Unsupported manual release target: $RELEASE_TARGET"
+              exit 1
+              ;;
+          esac
 
       - name: Install strict validation dependencies
         run: |

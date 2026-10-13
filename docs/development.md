@@ -254,7 +254,9 @@ When a discovery changes maintained behavior:
 
 Home Assistant installations normally pull the prebuilt `amd64` image named in
 `addon/config.yaml`. `main` is the stable channel; `develop` is the integrated
-development and physical-testing channel. The image workflow validates the
+development and physical-testing channel. Manually dispatched management
+qualification builds are restricted to `feature/management-app-foundation`
+and the `x.y.z-mgmt.N` version form. The image workflow validates the
 branch/version pairing before publishing, and only stable releases update
 `latest`. Follow the operational [release process](release-process.md) for
 versioning, promotion, immutable tags, and the required hotfix carry-forward

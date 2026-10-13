@@ -50,6 +50,33 @@ def test_develop_rejects_versions_outside_beta_convention(version):
         addon_release.release_metadata("develop", version)
 
 
+def test_management_branch_accepts_mgmt_version_without_latest():
+    metadata = addon_release.release_metadata(
+        "feature/management-app-foundation", "0.3.13-mgmt.1"
+    )
+
+    assert metadata.channel == "management-test"
+    assert metadata.image_tags == ("0.3.13-mgmt.1",)
+    assert metadata.publishes_latest is False
+
+
+@pytest.mark.parametrize(
+    "branch,version",
+    [
+        ("feature/management-app-foundation", "0.3.13"),
+        ("feature/management-app-foundation", "0.3.13-mgmt.0"),
+        ("feature/management-app-foundation", "0.3.13-mgmt.01"),
+        ("feature/management-app-foundation", "0.3.13-beta.1"),
+        ("feature/example", "0.3.13-mgmt.1"),
+        ("main", "0.3.13-mgmt.1"),
+        ("develop", "0.3.13-mgmt.1"),
+    ],
+)
+def test_management_version_is_restricted_to_exact_feature_branch(branch, version):
+    with pytest.raises(addon_release.ReleaseValidationError):
+        addon_release.release_metadata(branch, version)
+
+
 def test_unknown_branch_is_rejected():
     with pytest.raises(addon_release.ReleaseValidationError):
         addon_release.release_metadata("feature/example", "0.3.10-beta.1")
@@ -152,6 +179,35 @@ def test_cli_fails_before_emitting_outputs_for_invalid_pairing(tmp_path):
     assert not output.exists()
 
 
+def test_cli_writes_only_the_management_version_tag(tmp_path):
+    output = tmp_path / "github-output"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(MODULE_PATH),
+            "--branch",
+            "feature/management-app-foundation",
+            "--version",
+            "0.3.13-mgmt.1",
+            "--github-output",
+            str(output),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert output.read_text(encoding="utf-8") == (
+        "channel=management-test\n"
+        "publish_latest=false\n"
+        "image_tags<<PETLIBRO_IMAGE_TAGS\n"
+        "0.3.13-mgmt.1\n"
+        "PETLIBRO_IMAGE_TAGS\n"
+    )
+
+
 def test_workflow_uses_validated_tags_for_both_publish_steps():
     workflow = (ROOT / ".github" / "workflows" / "publish-addon-image.yml").read_text(
         encoding="utf-8"
@@ -164,3 +220,6 @@ def test_workflow_uses_validated_tags_for_both_publish_steps():
     assert 'scripts/addon_release.py --check-image-tag "${IMAGE}:${VERSION}"' in workflow
     assert "    needs: validate\n" in workflow
     assert "PYTHON_BIN=.venv/bin/python ./scripts/validate.sh --strict" in workflow
+    assert "release_target:" in workflow
+    assert "management-test" in workflow
+    assert '[[ "$RELEASE_BRANCH" != feature/management-app-foundation ]]' in workflow

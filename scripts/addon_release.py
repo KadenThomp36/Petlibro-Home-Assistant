@@ -17,6 +17,10 @@ STABLE_VERSION_RE = re.compile(
 DEVELOPMENT_VERSION_RE = re.compile(
     r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-beta\.([1-9][0-9]*)$"
 )
+MANAGEMENT_VERSION_RE = re.compile(
+    r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-mgmt\.([1-9][0-9]*)$"
+)
+MANAGEMENT_RELEASE_BRANCH = "feature/management-app-foundation"
 
 
 class ReleaseValidationError(ValueError):
@@ -58,8 +62,17 @@ def release_metadata(branch: str, version: str) -> ReleaseMetadata:
             )
         return ReleaseMetadata(branch, "development", version, (version,))
 
+    if branch == MANAGEMENT_RELEASE_BRANCH:
+        if MANAGEMENT_VERSION_RE.fullmatch(version) is None:
+            raise ReleaseValidationError(
+                "feature/management-app-foundation requires a prerelease version "
+                "in the form x.y.z-mgmt.N"
+            )
+        return ReleaseMetadata(branch, "management-test", version, (version,))
+
     raise ReleaseValidationError(
-        f"unsupported release branch {branch!r}; expected 'main' or 'develop'"
+        f"unsupported release branch {branch!r}; expected 'main', 'develop', or "
+        f"{MANAGEMENT_RELEASE_BRANCH!r}"
     )
 
 

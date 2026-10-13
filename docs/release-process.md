@@ -1,15 +1,24 @@
 # Release process
 
-The repository uses Git branches as its only add-on release-channel boundary:
+The repository uses Git branches as its add-on release-channel boundary:
 
 | Channel | Branch | Repository URL | Add-on version |
 | --- | --- | --- | --- |
 | Stable | `main` | `https://github.com/tannerln7/Petlibro-Home-Assistant` | stable `x.y.z` |
 | Development | `develop` | `https://github.com/tannerln7/Petlibro-Home-Assistant#develop` | `x.y.z-beta.N` |
+| Management qualification | `feature/management-app-foundation` | `https://github.com/tannerln7/Petlibro-Home-Assistant#feature/management-app-foundation` | `x.y.z-mgmt.N` |
 
 Each installation tracks one branch. Do not add both URLs to one Home Assistant
 instance. A `develop` change is invisible to `main` users, and a `main` change
 is invisible to `develop` users until it is carried forward.
+
+The management qualification channel is temporary and manually published. It
+exists only to qualify the management application without merging it into
+`main` or `develop`. Its workflow dispatch must explicitly select
+`management-test`, accepts only the exact management branch and `-mgmt.N`
+version form, and publishes only the immutable version tag. It never updates
+`latest`. Install this repository URL only on a test Home Assistant instance;
+the add-on slug is shared with the normal channels.
 
 ## Stable releases
 
@@ -53,6 +62,23 @@ prerelease version, when `develop` contains anything other than
 `x.y.z-beta.N`, or when the configured versioned image tag already exists.
 Increment the version instead of moving a published tag or overwriting a
 published image.
+
+## Management qualification releases
+
+Management builds reuse the normal add-on image publisher and all strict
+validation and immutable-tag checks. To publish one:
+
+1. advance `addon/config.yaml` to the next unused `x.y.z-mgmt.N` version;
+2. update `addon/CHANGELOG.md` and validate the complete repository;
+3. commit and push only `feature/management-app-foundation`;
+4. create and push the matching immutable `vX.Y.Z-mgmt.N` tag;
+5. manually dispatch `Publish add-on image` on that feature branch with
+   `release_target=management-test`;
+6. verify the exact GHCR manifest exists and that neither `latest` nor existing
+   stable/development tags changed.
+
+The management branch is not merged as part of this procedure, and this test
+release does not alter the separate State Agent release channel.
 
 ## Promotion to stable
 

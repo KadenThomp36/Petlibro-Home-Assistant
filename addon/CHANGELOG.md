@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.13-mgmt.1
+
+- Add the Petlibro Management browser application, TypeScript API, durable
+  SQLite operation journal, reconnectable WebSocket updates, and independently
+  supervised Python device-operations worker.
+- Add the authenticated read-only State Agent health inspection as the first
+  end-to-end capability, preserving AppDaemon, go2rtc, and State Agent
+  authority boundaries.
+- Add responsive Overview, Devices, Setup, Actions, Operations, Diagnostics,
+  Logs, History, and Settings interfaces with source-aware status and explicit
+  unavailable states instead of fabricated device telemetry or controls.
+- Support Home Assistant Ingress and opt-in CIDR-restricted direct LAN access
+  through the same HTTP and WebSocket backend. The application intentionally
+  provides no authentication or TLS for direct access.
+- Include the stable 0.3.12 camera transport, audio, AppDaemon, discovery,
+  State Agent, installer, and supporting infrastructure fixes.
+- Publish this management qualification build only from
+  `feature/management-app-foundation` under an immutable `-mgmt.N` image tag;
+  it does not update `latest` or either established release channel.
+
 ## 0.3.12-beta.7
 
 - Restore PLAF203 ACK recovery by recognizing the firmware's retransmission
