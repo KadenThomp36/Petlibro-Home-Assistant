@@ -31,7 +31,7 @@ jobs:
       - name: Install strict validation dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends gcc-arm-linux-gnueabihf shellcheck
+          sudo apt-get install --no-install-recommends gcc-arm-linux-gnueabihf libc6-dev-armhf-cross shellcheck
           python3 -m venv .venv
           .venv/bin/python -m pip install -r addon/appdaemon/requirements-dev.txt
           .venv/bin/python -m pip install -r installer/requirements.txt
