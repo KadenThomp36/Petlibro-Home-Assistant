@@ -510,7 +510,7 @@ def test_missing_uid_readiness_warning_is_actionable_and_not_repeated():
     assert len(matching) == 1
 
 
-def test_stale_or_error_camera_status_requests_reresolution_after_backoff():
+def test_resolution_due_uses_missing_or_expired_ip_with_backoff():
     coordinator = object.__new__(device_discovery.PetlibroDiscovery)
     coordinator.retry_seconds = 60
     coordinator.refresh_minutes = 360
@@ -523,13 +523,17 @@ def test_stale_or_error_camera_status_requests_reresolution_after_backoff():
         ),
         "last_ip_resolved": device_discovery.format_timestamp(now),
     }
-    assert coordinator._resolution_due(device, now, unhealthy=True)
+    assert not coordinator._resolution_due(device, now)
+    device["last_ip_resolved"] = device_discovery.format_timestamp(
+        now - datetime.timedelta(minutes=360)
+    )
+    assert coordinator._resolution_due(device, now)
     device["last_ip_attempt"] = device_discovery.format_timestamp(
         now - datetime.timedelta(seconds=30)
     )
-    assert not coordinator._resolution_due(device, now, unhealthy=True)
+    assert not coordinator._resolution_due(device, now)
     device["manual_override"] = True
-    assert not coordinator._resolution_due(device, now, unhealthy=True)
+    assert not coordinator._resolution_due(device, now)
 
 
 def test_manual_ip_override_is_not_replaced_by_forced_refresh():

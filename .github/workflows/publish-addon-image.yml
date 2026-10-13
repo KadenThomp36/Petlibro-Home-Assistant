@@ -20,9 +20,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validate:
+    name: Validate repository
+    if: github.repository == 'tannerln7/Petlibro-Home-Assistant'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install strict validation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends gcc-arm-linux-gnueabihf shellcheck
+          python3 -m venv .venv
+          .venv/bin/python -m pip install -r addon/appdaemon/requirements-dev.txt
+          .venv/bin/python -m pip install -r installer/requirements.txt
+
+      - name: Run strict repository validation
+        run: PYTHON_BIN=.venv/bin/python ./scripts/validate.sh --strict
+
   prepare:
     name: Prepare image build
     if: github.repository == 'tannerln7/Petlibro-Home-Assistant'
+    needs: validate
     runs-on: ubuntu-latest
     outputs:
       architectures: ${{ steps.info.outputs.architectures }}
@@ -101,10 +121,7 @@ jobs:
           VERSION: ${{ steps.normalize.outputs.version }}
         run: |
           set -euo pipefail
-          if docker buildx imagetools inspect "${IMAGE}:${VERSION}" >/dev/null 2>&1; then
-            echo "::error::Image tag ${IMAGE}:${VERSION} already exists; increment addon/config.yaml instead of overwriting a release"
-            exit 1
-          fi
+          python3 scripts/addon_release.py --check-image-tag "${IMAGE}:${VERSION}"
 
       - name: Prepare build matrix
         id: matrix

@@ -17,6 +17,11 @@ VALID_PUBLIC_KEY = (
 
 
 class PayloadTests(unittest.TestCase):
+    @staticmethod
+    def _snapshots(data: Path) -> list[Path]:
+        root = data / "plaf203-bootstrap" / "preinstall-state"
+        return sorted(path for path in root.iterdir() if path.is_dir())
+
     def _state_agent_tree(self, root: Path) -> Path:
         agent = root / "agent"
         (agent / "runit" / "plaf203-state-agent").mkdir(parents=True)
@@ -67,10 +72,10 @@ class PayloadTests(unittest.TestCase):
         (feeder / "ota2").mkdir()
         (feeder / "data" / "ota").mkdir(parents=True)
         (feeder / "data" / "attr").mkdir()
-        (feeder / "data" / "attr" / "state.bin").write_bytes(b"device-state")
+        (feeder / "data" / "attr" / "state.bin").write_bytes(b"S" * 236)
         (feeder / "data" / "feed_plan").mkdir()
         (feeder / "data" / "feed_plan" / "index.bin").write_bytes(b"\x01")
-        (feeder / "data" / "feed_plan" / "plan.bin").write_bytes(b"feed-plan")
+        (feeder / "data" / "feed_plan" / "plan.bin").write_bytes(b"P" * 47)
         donor = b"\x7fELF" + b"stock-oem" * 100
         donor_slot = "ota1" if execution_slot == "ota2" else "ota2"
         (feeder / donor_slot / "AF203_FW").write_bytes(donor)
@@ -122,11 +127,11 @@ class PayloadTests(unittest.TestCase):
                 (data / "dropbear" / "BUILD_INFO.dropbear.json").read_text(),
             )
 
-    def test_bootstrap_retry_does_not_replace_preinstall_state_snapshot(self) -> None:
+    def test_bootstrap_retry_captures_fresh_state_and_preserves_first_snapshot(self) -> None:
         feeder, _donor, temporary = self._run_installer("ota2")
         with temporary:
             data = feeder / "data"
-            (data / "attr" / "state.bin").write_bytes(b"later-device-state")
+            (data / "attr" / "state.bin").write_bytes(b"N" * 236)
             (data / "feed_plan" / "index.bin").write_bytes(b"\x00")
             (data / "feed_plan" / "plan.bin").write_bytes(b"")
 
@@ -141,15 +146,77 @@ class PayloadTests(unittest.TestCase):
                 timeout=15,
             )
 
-            backup = data / "plaf203-bootstrap" / "preinstall-state"
-            self.assertEqual(
-                b"device-state", (backup / "attr" / "state.bin").read_bytes()
+            first, second = self._snapshots(data)
+            self.assertEqual("snapshot-000001", first.name)
+            self.assertEqual("snapshot-000002", second.name)
+            self.assertTrue((first / "complete").is_file())
+            self.assertTrue((second / "complete").is_file())
+            self.assertEqual(b"S" * 236, (first / "attr" / "state.bin").read_bytes())
+            self.assertEqual(b"\x01", (first / "feed_plan" / "index.bin").read_bytes())
+            self.assertEqual(b"P" * 47, (first / "feed_plan" / "plan.bin").read_bytes())
+            self.assertEqual(b"N" * 236, (second / "attr" / "state.bin").read_bytes())
+            self.assertEqual(b"\x00", (second / "feed_plan" / "index.bin").read_bytes())
+            self.assertEqual(b"", (second / "feed_plan" / "plan.bin").read_bytes())
+
+    def test_retry_preserves_incomplete_attempt_and_uses_new_identity(self) -> None:
+        feeder, _donor, temporary = self._run_installer("ota2")
+        with temporary:
+            data = feeder / "data"
+            snapshot_root = data / "plaf203-bootstrap" / "preinstall-state"
+            interrupted = snapshot_root / "snapshot-000002"
+            interrupted.mkdir()
+            (interrupted / "capture-interrupted").write_text("unchanged\n")
+            (data / "attr" / "state.bin").write_bytes(b"N" * 236)
+            (data / "feed_plan" / "index.bin").write_bytes(b"\x00")
+            (data / "feed_plan" / "plan.bin").write_bytes(b"")
+
+            env = os.environ | {
+                "PLAF203_BOOTSTRAP_TEST_ROOT": str(feeder),
+                "PLAF203_BOOTSTRAP_TEST_SLOT": "ota2",
+            }
+            subprocess.run(
+                ["/bin/sh", str(Path(temporary.name) / "payload")],
+                env=env,
+                check=True,
+                timeout=15,
             )
-            self.assertEqual(
-                b"\x01", (backup / "feed_plan" / "index.bin").read_bytes()
+
+            first, stale, latest = self._snapshots(data)
+            self.assertEqual("snapshot-000001", first.name)
+            self.assertEqual("snapshot-000002", stale.name)
+            self.assertEqual("snapshot-000003", latest.name)
+            self.assertEqual("unchanged\n", (stale / "capture-interrupted").read_text())
+            self.assertFalse((stale / "complete").exists())
+            self.assertTrue((latest / "complete").is_file())
+            self.assertEqual(b"N" * 236, (latest / "attr" / "state.bin").read_bytes())
+
+    def test_retry_rejects_invalid_current_state_without_damaging_first_snapshot(self) -> None:
+        feeder, _donor, temporary = self._run_installer("ota2")
+        with temporary:
+            data = feeder / "data"
+            (data / "attr" / "state.bin").unlink()
+            env = os.environ | {
+                "PLAF203_BOOTSTRAP_TEST_ROOT": str(feeder),
+                "PLAF203_BOOTSTRAP_TEST_SLOT": "ota2",
+            }
+
+            result = subprocess.run(
+                ["/bin/sh", str(Path(temporary.name) / "payload")],
+                env=env,
+                check=False,
+                timeout=15,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
-            self.assertEqual(
-                b"feed-plan", (backup / "feed_plan" / "plan.bin").read_bytes()
+
+            self.assertNotEqual(0, result.returncode)
+            first, failed = self._snapshots(data)
+            self.assertTrue((first / "complete").is_file())
+            self.assertEqual(b"S" * 236, (first / "attr" / "state.bin").read_bytes())
+            self.assertFalse((failed / "complete").exists())
+            self.assertIn(
+                "invalid_preinstall_state_backup",
+                (data / "plaf203-bootstrap" / "status").read_text(),
             )
 
     def _assert_successful_install(self, feeder: Path, donor: bytes) -> None:
@@ -181,16 +248,18 @@ class PayloadTests(unittest.TestCase):
             "installed_rebooting_to_ota1\n",
             (feeder / "data" / "plaf203-bootstrap" / "status").read_text(),
         )
-        state_backup = feeder / "data" / "plaf203-bootstrap" / "preinstall-state"
+        snapshots = self._snapshots(feeder / "data")
+        self.assertEqual(["snapshot-000001"], [path.name for path in snapshots])
+        state_backup = snapshots[0]
         self.assertTrue((state_backup / "complete").is_file())
         self.assertEqual(
-            b"device-state", (state_backup / "attr" / "state.bin").read_bytes()
+            b"S" * 236, (state_backup / "attr" / "state.bin").read_bytes()
         )
         self.assertEqual(
             b"\x01", (state_backup / "feed_plan" / "index.bin").read_bytes()
         )
         self.assertEqual(
-            b"feed-plan", (state_backup / "feed_plan" / "plan.bin").read_bytes()
+            b"P" * 47, (state_backup / "feed_plan" / "plan.bin").read_bytes()
         )
 
     def test_state_agent_startup_matches_only_its_runsvdir_tree(self) -> None:
@@ -256,6 +325,11 @@ class PayloadTests(unittest.TestCase):
             (feeder / "ota1").mkdir(parents=True)
             (feeder / "ota2").mkdir()
             (feeder / "data" / "ota").mkdir(parents=True)
+            (feeder / "data" / "attr").mkdir()
+            (feeder / "data" / "attr" / "state.bin").write_bytes(b"S" * 236)
+            (feeder / "data" / "feed_plan").mkdir()
+            (feeder / "data" / "feed_plan" / "index.bin").write_bytes(b"\x00")
+            (feeder / "data" / "feed_plan" / "plan.bin").write_bytes(b"")
             donor = b"\x7fELF" + b"stock-oem" * 100
             (feeder / "ota2" / "AF203_FW").write_bytes(donor)
             (feeder / "ota2" / "AF203_FW").chmod(0o755)

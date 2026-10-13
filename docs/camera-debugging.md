@@ -344,7 +344,8 @@ offset map and naming rules.
 
 ## Preparing a useful report
 
-For a bounded live test, retain:
+Use the [live qualification harness](../addon/tests/live/README.md) for bounded
+consumer and decode checks. For a useful report, retain:
 
 - sanitized Petlibro URL options
 - camera model and firmware

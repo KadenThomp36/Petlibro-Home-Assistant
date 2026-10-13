@@ -89,8 +89,9 @@ fresh feeder state from `/v1/core` is authoritative.
 
 ## Feeder state API and reconciliation
 
-Persistent settings and feeding plans use the feeder-side State Agent snapshot
-API.
+Persistent settings and feeding plans use the feeder-side State Agent API. A
+request reads each allowlisted OEM file once and validates its structure, but
+does not make the independently firmware-owned files an atomic snapshot.
 When `petlibro_state_agent_url` is empty, the renderer derives
 `http://<discovered-feeder-ip>:8765` for each device. A custom URL may include
 one `{ip}` placeholder. A fixed URL is suitable only when one feeder is
@@ -243,10 +244,11 @@ already holds valid retained observations.
 The coordinator builds `serial -> UID -> IP -> stream` from feeder MQTT traffic
 and the LAN_SEARCH3/KNOCK2 probe. A valid device gets a direct-IP URL, so normal
 playback does not repeat the slower subnet scan. It periodically refreshes
-cached addresses
-and re-resolves after camera status becomes stale, offline, or error. A failed
-lookup retains the last address, marks readiness false, and retries with
-backoff. go2rtc restarts only when the rendered config bytes change.
+cached addresses. Camera status controls availability reporting, but does not
+by itself trigger address discovery: idle, authentication, transport, and media
+failures do not establish that the feeder moved. A failed lookup retains the
+last address, marks readiness false, and retries with backoff. go2rtc restarts
+only when the rendered config bytes change.
 
 Each lookup uses one absolute deadline and a staged target order: cached IP,
 global and directed broadcasts, other known registry addresses, then one

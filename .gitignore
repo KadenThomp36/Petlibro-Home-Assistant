@@ -27,6 +27,11 @@ coverage.json
 junit.xml
 htmlcov/
 
+# Node.js dependencies and repository-local tooling
+node_modules/
+/package.json
+/package-lock.json
+
 # Build and runtime output
 /build/
 dist/
@@ -71,3 +76,7 @@ capture/
 .vscode/*
 .idea/
 /docs/ghidra-map.md
+/docs/CODEX_REMEDIATION_ROADMAP.md
+/docs/petlibro-management-architecture-coverage-map.md
+/docs/petlibro-management-implementation-guide.md
+/docs/petlibro-management-migration-implementation-sequence.md

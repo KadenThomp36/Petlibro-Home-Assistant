@@ -188,6 +188,7 @@ class RenderConfigTests(unittest.TestCase):
             )
             self.assertIn("petlibro_discovery:", apps)
             self.assertIn("plaf203_example123:", apps)
+            self.assertIn("        - homeassistant/status\n", appdaemon)
             self.assertIn('device_uid: "PLAF20300000000ABCD0"', apps)
             self.assertIn("persist_feeder_mqtt: false", apps)
             self.assertIn('feeder_mqtt_host: ""', apps)
@@ -416,6 +417,57 @@ class RenderConfigTests(unittest.TestCase):
             live_status.write_text('{"status":"online"}\n', encoding="utf-8")
             self.assertEqual((False, False), self.render_all(options, data_dir))
             self.assertTrue(live_status.exists())
+
+    def test_only_appdaemon_renderer_persists_registry_overrides(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            data_dir = Path(temporary)
+            registry_path = data_dir / "devices.json"
+            registry_path.write_text(
+                '{"schema_version": 1, "devices": {}}\n', encoding="utf-8"
+            )
+            original = registry_path.read_bytes()
+            options = self.options(devices=[self.manual_device()])
+
+            render_config.render_go2rtc(options, data_dir, TEMPLATES)
+
+            self.assertEqual(original, registry_path.read_bytes())
+            self.assertIn(
+                "petlibro://192.0.2.100",
+                (data_dir / "go2rtc.yaml").read_text(encoding="utf-8"),
+            )
+
+            render_config.render_appdaemon(options, data_dir, TEMPLATES)
+            persisted = json.loads(registry_path.read_text(encoding="utf-8"))
+            self.assertTrue(
+                persisted["devices"]["PLAF203/EXAMPLE123"]["manual_override"]
+            )
+
+    def test_apps_render_tracks_registry_additions_and_removals(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            data_dir = Path(temporary)
+            options = self.options()
+            first = self.manual_device()
+            second = self.manual_device("SECOND456")
+            second.update(
+                name="kitchen_feeder",
+                uid="PLAF20300000000EFGH1",
+                ip_address="192.0.2.101",
+            )
+
+            options["devices"] = [first]
+            self.render_all(options, data_dir)
+            apps = (data_dir / "apps.yaml").read_text(encoding="utf-8")
+            self.assertIn("plaf203_example123:", apps)
+            self.assertNotIn("plaf203_second456:", apps)
+
+            options["devices"] = [second]
+            (data_dir / "devices.json").write_text(
+                json.dumps({"schema_version": 1, "devices": {}}), encoding="utf-8"
+            )
+            self.render_all(options, data_dir)
+            apps = (data_dir / "apps.yaml").read_text(encoding="utf-8")
+            self.assertNotIn("plaf203_example123:", apps)
+            self.assertIn("plaf203_second456:", apps)
 
     def test_migrates_legacy_options_and_ignores_unknown_secret(self):
         with tempfile.TemporaryDirectory() as temporary:

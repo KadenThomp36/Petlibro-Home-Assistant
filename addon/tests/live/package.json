@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "description": "Browser receiver validation for the Petlibro live qualification suite",
+  "scripts": { "test": "node --check browser.cjs" },
+  "devDependencies": { "playwright": "^1.55.0" }
+}

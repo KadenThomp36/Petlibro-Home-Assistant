@@ -31,7 +31,7 @@ convenience.
   and installer validation;
 - Docker with Compose for image/config validation;
 - FFmpeg for live stream checks;
-- optional `shellcheck`.
+- `shellcheck` for strict validation (optional for permissive local checks).
 
 Create a local Python environment:
 
@@ -47,10 +47,19 @@ keys, or generated installer output in tracked files.
 
 ## Validation
 
-Run the canonical repository checks from the root:
+Run the developer-friendly repository checks from the root:
 
 ```bash
 ./scripts/validate.sh
+```
+
+This permissive mode reports any unavailable AppDaemon, ARM, or ShellCheck
+checks as explicit skips. Release qualification and the image publication
+workflow use strict mode, which fails before validation when any of those
+dependencies is unavailable:
+
+```bash
+./scripts/validate.sh --strict
 ```
 
 Focused checks:
@@ -62,14 +71,17 @@ python3 -m pytest installer/tests -q
 make -C state-agent clean all
 make -C state-agent clean arm-release
 (cd addon/go2rtc && go test ./pkg/petlibro ./cmd/petlibro-resolve)
-(cd addon/go2rtc && go vet ./pkg/petlibro ./cmd/petlibro-resolve)
+(cd addon/go2rtc && go test ./internal/streams -run '^Test(TimestampContinuity|StreamCorrelationIDs)')
+(cd addon/go2rtc && go test ./pkg/rtsp -run '^Test(PacketWriter|PacketWriters|WriteInterleavedData)')
+(cd addon/go2rtc && go vet ./internal/streams ./pkg/petlibro ./pkg/rtsp ./cmd/petlibro-resolve)
 docker compose --env-file docker/.env.example -f docker/docker-compose.yml config --quiet
 ```
 
 The embedded go2rtc tree retains upstream packages needed to build the binary,
-but this fork's maintained Go checks target the Petlibro transport and resolver.
-The complete imported upstream test graph has optional platform and FFmpeg
-assumptions that are outside this repository's supported validation matrix.
+but this fork's maintained Go checks target the Petlibro transport and resolver,
+the modified stream graph, and RTSP packet delivery. The complete imported
+upstream test graph has optional platform and FFmpeg assumptions that are
+outside this repository's supported validation matrix.
 
 Build the add-on image with:
 
@@ -82,7 +94,8 @@ The local image build defaults to bounded Go compile parallelism. Override
 
 Live feeder tests are separate from deterministic validation. Supply values
 only through ignored `docker/.env`, generated installer files, or Home
-Assistant options.
+Assistant options. The bounded [live qualification harness](../addon/tests/live/README.md)
+documents its additional FFmpeg, browser, and endpoint requirements.
 
 ## Add-on and controller development
 

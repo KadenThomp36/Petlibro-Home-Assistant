@@ -181,26 +181,49 @@ if [ "$available_kb" -lt "$required_kb" ]; then
     exit 76
 fi
 
-# Preserve the feeder-local settings and schedules before changing startup or
-# sidecar services. The temporary broker must not mutate either source, but a
-# one-time device-local backup gives an authorized maintainer a recovery point
-# if a firmware/version-specific behavior is discovered later. Never replace
-# the first successful pre-install snapshot during a bootstrap retry.
+# Preserve a fresh copy of feeder-local settings and schedules before changing
+# startup or sidecar services. mkdir atomically claims an attempt number; an
+# interrupted directory remains visibly incomplete and is never reused.
 PHASE=preserving_feeder_state
-if [ ! -f "$STATE_BACKUP/complete" ]; then
-    rm -rf "$STATE_BACKUP" "$STATE_BACKUP.new"
-    mkdir -p "$STATE_BACKUP.new"
-    if [ -e "$DATA/attr" ]; then
-        cp -Rp "$DATA/attr" "$STATE_BACKUP.new/attr"
+valid_state_snapshot() {
+    snapshot="$1"
+    [ -f "$snapshot/attr/state.bin" ] || return 1
+    [ "$(wc -c < "$snapshot/attr/state.bin" | tr -d ' ')" = 236 ] || return 1
+    [ -f "$snapshot/feed_plan/index.bin" ] || return 1
+    [ -f "$snapshot/feed_plan/plan.bin" ] || return 1
+    plan_count="$(od -An -tu1 -N1 "$snapshot/feed_plan/index.bin" 2>/dev/null | tr -d ' ')"
+    case "$plan_count" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    plan_bytes="$(wc -c < "$snapshot/feed_plan/plan.bin" | tr -d ' ')"
+    [ "$plan_bytes" = "$((plan_count * 47))" ]
+}
+
+mkdir -p "$STATE_BACKUP"
+snapshot_number=1
+while :; do
+    snapshot_name="$(printf 'snapshot-%06d' "$snapshot_number")"
+    SNAPSHOT="$STATE_BACKUP/$snapshot_name"
+    if mkdir "$SNAPSHOT" 2>/dev/null; then
+        break
     fi
-    if [ -e "$DATA/feed_plan" ]; then
-        cp -Rp "$DATA/feed_plan" "$STATE_BACKUP.new/feed_plan"
+    snapshot_number=$((snapshot_number + 1))
+    if [ "$snapshot_number" -gt 999999 ]; then
+        FAIL_REASON=invalid_preinstall_state_backup
+        exit 77
     fi
-    touch "$STATE_BACKUP.new/complete"
-    chmod -R go-rwx "$STATE_BACKUP.new"
-    mv "$STATE_BACKUP.new" "$STATE_BACKUP"
-    sync
+done
+printf '%s\n' "capturing_$snapshot_name" > "$JOURNAL"
+if ! cp -Rp "$DATA/attr" "$SNAPSHOT/attr" || \
+   ! cp -Rp "$DATA/feed_plan" "$SNAPSHOT/feed_plan" || \
+   ! valid_state_snapshot "$SNAPSHOT"; then
+    FAIL_REASON=invalid_preinstall_state_backup
+    exit 77
 fi
+chmod -R go-rwx "$SNAPSHOT"
+touch "$SNAPSHOT/complete"
+chmod go-rwx "$SNAPSHOT/complete"
+sync
 
 # OEM OTA rewrites app_start.sh to the inactive slot. Replace it with a minimal
 # donor startup and durably select the untouched donor before any mutation. If
