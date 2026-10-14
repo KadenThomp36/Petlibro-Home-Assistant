@@ -41,6 +41,30 @@ const snapshot = {
   ],
 } as const;
 
+const deviceSnapshot = {
+  apiVersion: 'v1',
+  generatedAt: '2026-10-13T12:00:00.000Z',
+  devices: [],
+  warnings: [],
+  services: [
+    {
+      id: 'mosquitto',
+      name: 'MQTT broker',
+      availability: 'unavailable',
+      detail: 'The configured broker could not be reached.',
+      observation: {
+        source: 'mqtt-broker',
+        authority: 'mosquitto',
+        collectedAt: '2026-10-13T12:00:00.000Z',
+        observedAt: '2026-10-13T12:00:00.000Z',
+        freshness: 'fresh',
+        verification: 'reachable',
+        scope: 'Bounded MQTT connection probe.',
+      },
+    },
+  ],
+} as const;
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -53,7 +77,11 @@ describe('OverviewPage', () => {
         const url = String(input);
         return Promise.resolve(
           Response.json(
-            url.includes('/operations') ? { operations: [] } : snapshot,
+            url.includes('/operations')
+              ? { operations: [] }
+              : url.includes('/devices/overview')
+                ? deviceSnapshot
+                : snapshot,
           ),
         );
       }),
@@ -74,8 +102,8 @@ describe('OverviewPage', () => {
       }),
     ).toBeInTheDocument();
     expect(await screen.findByText('0.1.0-test')).toBeInTheDocument();
-    expect(screen.getByText('Device operations worker')).toBeInTheDocument();
-    expect(screen.getAllByText('Not configured')).not.toHaveLength(0);
+    expect(screen.getByText('MQTT broker')).toBeInTheDocument();
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
     expect(screen.queryByText(/feeder is healthy/i)).not.toBeInTheDocument();
   });
 });

@@ -5,7 +5,7 @@ the planned Petlibro Management application. It is independently runnable and
 packaged into the Home Assistant add-on. Existing AppDaemon and go2rtc services
 remain the production operational authorities.
 
-The foundation implements two vertical backend paths and presents their real
+The application implements three vertical backend paths and presents their real
 state across the management route inventory:
 
 ```text
@@ -24,12 +24,19 @@ Operations page
   -> authenticated, read-only State Agent /health request
   -> structured result/evidence
   -> HTTP snapshot/history + reconnectable browser WebSocket notification
+
+Overview / Devices / Diagnostics
+  -> GET /api/v1/devices/overview
+  -> DeviceOverviewService
+  -> Supervisor-owned options + AppDaemon discovery/controller observations
+  -> go2rtc physical-session status + bounded MQTT authentication probe
+  -> source-, freshness-, and verification-aware device projection
 ```
 
-The system endpoint reports management readiness and separately probes worker
-transport readiness. AppDaemon and go2rtc adapters remain unconfigured. Neither
-management nor worker readiness is presented as feeder, broker, controller,
-State Agent, or camera health.
+The system endpoint reports management and worker transport readiness. The
+device overview separately reports operational services and correlated devices;
+neither management nor worker readiness is presented as feeder, broker,
+controller, State Agent, or camera health.
 
 ## Technology baseline
 
@@ -92,6 +99,7 @@ PETLIBRO_WORKER_SOCKET=.data/worker.sock npm run worker
 
 # Terminal 2
 export PETLIBRO_MANAGEMENT_DATA_DIR=.data
+export PETLIBRO_RUNTIME_DATA_DIR=/path/to/synthetic-or-mounted-addon-data
 export PETLIBRO_WORKER_SOCKET=.data/worker.sock
 export PETLIBRO_STATE_AGENT_URL=http://FEEDER_IP:8765
 export PETLIBRO_STATE_AGENT_TOKEN='replace-with-protected-token'
@@ -138,7 +146,7 @@ Root-path and runtime-variable prefix support is implemented. Browser WebSocket
 reconnect uses a durable event cursor and HTTP snapshot/history as the recovery
 source. Container tests cover direct and simulated Ingress HTTP, deep links,
 assets, API calls, and WebSocket upgrades. Installation in a real Home Assistant
-Supervisor remains to be qualified.
+Supervisor has also exercised the Ingress route successfully.
 
 ## Implemented and deferred boundaries
 
@@ -154,6 +162,12 @@ Implemented now:
   operation status/list, execution evidence, and empty-state presentation;
 - accessible loading, API-error, not-found, and reduced-motion behavior;
 - source-aware status contract and response validation;
+- coherent read-only device overview contract backed by Supervisor options,
+  AppDaemon discovery/controller status, go2rtc runtime status, and a bounded
+  MQTT CONNECT/CONNACK authentication probe;
+- correlated Devices view with masked camera UID, discovered address, feeder
+  MQTT activity, reconciliation state, State Agent-verified revision/plan
+  summary, physical camera session state, resolution, and health counters;
 - thin versioned HTTP adapter and explicit application-service composition;
 - private versioned Python worker with typed invocation deduplication;
 - real authenticated State Agent health inspection with bounded safe results;
@@ -176,8 +190,10 @@ Intentionally not implemented:
 - installer capability extraction beyond the isolated State Agent health probe;
 - device-changing capabilities, worker-owned durable transaction recovery, or cancellation;
 - operator checkpoints or full action catalog/schema forms;
-- AppDaemon, go2rtc, State Agent, Mosquitto, or Supervisor adapters;
-- device state, controls, setup execution, or fabricated demo data;
+- direct Supervisor/Home Assistant API access, service control, or option writes;
+- routine feeder controls, setup execution, or fabricated demo data;
+- a current Home Assistant health heartbeat (only historical birth events are
+  available from AppDaemon without broader API permissions);
 - application authentication or TLS;
 - live Home Assistant Supervisor/Ingress qualification.
 

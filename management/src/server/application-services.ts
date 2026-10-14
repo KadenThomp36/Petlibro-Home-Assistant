@@ -1,12 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { DeviceOverviewService } from '#/application/device-overview-service';
 import { OperationManager } from '#/application/operation-manager';
 import { SystemStatusService } from '#/application/system-status-service';
+import { MqttBrokerAdapter } from '#/infrastructure/observations/mqtt-broker-adapter';
+import { RuntimeFileAdapter } from '#/infrastructure/observations/runtime-file-adapter';
 import { SqliteOperationJournal } from '#/infrastructure/persistence/sqlite-operation-journal';
 import { PythonWorkerClient } from '#/infrastructure/worker/python-worker-client';
 
 export interface ApplicationServices {
   readonly systemStatus: SystemStatusService;
+  readonly deviceOverview: DeviceOverviewService;
   readonly operations: OperationManager;
 }
 
@@ -20,6 +24,9 @@ export function createApplicationServices(
     environment.PETLIBRO_WORKER_SOCKET ?? `${dataDirectory}/worker.sock`,
   );
   const worker = new PythonWorkerClient(workerSocket);
+  const runtimeDataDirectory = resolve(
+    environment.PETLIBRO_RUNTIME_DATA_DIR ?? '.runtime-data',
+  );
   const stateAgentConfiguration = {
     ...(environment.PETLIBRO_STATE_AGENT_URL === undefined
       ? {}
@@ -33,6 +40,10 @@ export function createApplicationServices(
     systemStatus: new SystemStatusService(
       environment.PETLIBRO_MANAGEMENT_VERSION ?? '0.1.0-development',
       worker,
+    ),
+    deviceOverview: new DeviceOverviewService(
+      new RuntimeFileAdapter(runtimeDataDirectory),
+      new MqttBrokerAdapter(),
     ),
     operations: new OperationManager(
       new SqliteOperationJournal(`${dataDirectory}/management.sqlite`),

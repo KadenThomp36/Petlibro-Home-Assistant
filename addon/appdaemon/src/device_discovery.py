@@ -109,7 +109,11 @@ class DeviceRegistry:
     def __init__(self, path: str | Path, now: Callable[[], datetime.datetime] = utc_now):
         self.path = Path(path)
         self.now = now
-        self.data: dict[str, object] = {"schema_version": SCHEMA_VERSION, "devices": {}}
+        self.data: dict[str, object] = {
+            "schema_version": SCHEMA_VERSION,
+            "devices": {},
+            "last_update": None,
+        }
         self.load()
 
     @property
@@ -130,7 +134,11 @@ class DeviceRegistry:
         for key, device in devices.items():
             if isinstance(key, str) and isinstance(device, dict):
                 clean[key] = self._sanitize(device)
-        self.data = {"schema_version": SCHEMA_VERSION, "devices": clean}
+        self.data = {
+            "schema_version": SCHEMA_VERSION,
+            "devices": clean,
+            "last_update": raw.get("last_update"),
+        }
 
     def observe(self, product: str, serial: str, topic_root: str) -> tuple[str, dict, bool]:
         key = f"{product}/{serial}"
@@ -196,6 +204,7 @@ class DeviceRegistry:
         return changed
 
     def persist(self) -> bool:
+        self.data["last_update"] = format_timestamp(self.now())
         content = (json.dumps(self.data, indent=2, sort_keys=True) + "\n").encode()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -630,6 +639,9 @@ class PetlibroDiscovery(ADBase):
         if changed:
             self._schedule_flush(config_dirty=False)
         else:
+            # This file is also the supported controller/discovery heartbeat for
+            # read-only management observers. No device state is inferred from it.
+            self.registry.persist()
             self._publish_all()
 
     def _camera_online(self, device: dict, now: datetime.datetime) -> bool:

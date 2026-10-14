@@ -658,6 +658,14 @@ The new TypeScript adapter should provide only supported observations or authori
 - Start a second active routine controller with the same feeder and MQTT identity.
 - Alter discovery unique IDs, command semantics, or availability behavior as a side effect of adding the dashboard.
 
+**Implemented read-only boundary:** AppDaemon atomically publishes a
+per-device controller observation containing its lifecycle, feeder MQTT state,
+reconciliation state, State Agent health, write readiness, recent activity, and
+a deliberately bounded summary of the latest State Agent-verified truth. The
+discovery registry carries a process heartbeat. Management reads these files;
+it does not inspect AppDaemon's private namespace or use retained HA MQTT values
+as verified truth.
+
 **Future:** the AppDaemon migration changes the implementation of the routine controller, not the dashboard's business meaning. The future controller should remain independently supervised or otherwise sufficiently isolated from UI server failures. A single-writer, verified cutover is mandatory.
 
 ### 8.2 State Agent
@@ -672,11 +680,19 @@ The existing go2rtc fork owns the physical camera session, transport, codec/cloc
 
 The management UI can display camera readiness, status, stream metadata, diagnostic traces where enabled, and authorized playback. It must not reinterpret a successful RTSP/WebRTC client connection as proof of unrelated device state.
 
+Management now consumes the existing schema-versioned atomic go2rtc status
+files. Missing status is represented as “no physical session observed” rather
+than a service failure because camera transport is demand-driven.
+
 A future TypeScript routine controller may change who publishes camera metadata without requiring go2rtc to be rewritten. Distinguish camera control/data plane from management health and event plane.
 
 ### 8.4 Mosquitto and broker handoff
 
 The broker is an independent authority for accounts, ACLs, listener ownership and authentication. The installer can probe credentials; it cannot claim that creating an account was successful solely because a user clicked a button.
+
+The read-only dashboard uses a cached, two-second MQTT CONNECT/CONNACK probe
+with the Supervisor-owned configured credentials. It disconnects without
+subscribing or publishing and never returns credentials to the browser.
 
 The current installer assumes a separate setup host in its normal flow. In the new colocated add-on design, both final and temporary feeder-facing listeners need port **1883**. A broker handoff is an explicit exclusive-resource transition; verify the chosen sequence in live tests before assuming it works.
 
@@ -689,6 +705,13 @@ Operator messaging must warn of consequences to unrelated MQTT devices during Mo
 The current `addon/config.yaml` and `addon/render_config.py` establish a Supervisor-owned options flow which produces atomic runtime configuration. New management functionality must not create an undocumented second writable configuration authority.
 
 The management app should read safe effective configuration, maintain its own management-only settings separately, and apply supported runtime option changes through the approved Supervisor/integration boundary. Verify read-back, rendered configuration adoption and required service transitions.
+
+The current observation adapter reads `/data/options.json` as the
+Supervisor-owned effective configuration source. The add-on does not request
+Supervisor or Home Assistant API permissions, so current HA service health,
+service control, and option writes remain explicitly unavailable. Historical
+Home Assistant birth events observed by AppDaemon are not treated as a current
+health heartbeat.
 
 **Critical startup invariant:** the management UI must be reachable when no feeder is configured and when AppDaemon/go2rtc have failed. A malformed operational configuration must not prevent the management service from explaining the failure or offering safe remediation.
 
@@ -1015,6 +1038,7 @@ The first end-to-end proof should use a safe read-only capability and the actual
 | SQLite durable app state | **Selected; operation journal implemented** | Transactional snapshot/event writes and schema version validated; qualify `/data` backup/restore, volume and production concurrency |
 | Worker binary builds moved to image build | **Candidate** | Prove equivalence and device-specific assembly separation |
 | Management independent of AppDaemon/go2rtc startup | **Established** | Separate supervised process and fault presentation |
+| Source-aware operational device projection | **Implemented read-only milestone** | AppDaemon registry/controller files, go2rtc status, Supervisor options and bounded MQTT authentication probe; missing/stale sources remain separate |
 | Ingress default; direct-browser capable | **Implemented foundation** | One backend/build, dynamic Ingress prefix, source-restricted Ingress and opt-in CIDR-restricted direct listener |
 | Direct-access authentication choice | **External responsibility** | Application provides no authentication/TLS; use trusted LAN or externally authenticated reverse proxy |
 | Supervisor-mediated add-on options application | **Planned, requires validation** | Permissions and restart/adoption rules must be demonstrated |

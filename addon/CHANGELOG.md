@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.13-mgmt.3
+
+- Add read-only AppDaemon controller and discovery observations.
+- Add source-aware device identity, state, and verification projections.
+- Integrate go2rtc camera status, MQTT broker authentication checks,
+  and Supervisor configuration observations.
+- Populate Overview, Devices, and Diagnostics with real operational
+  data, provenance, freshness, and explicit unavailable states.
+- Expand regression coverage for observation adapters and recovery.
+
 ## 0.3.13-mgmt.2
 
 - Add the Petlibro Management browser application, TypeScript API, durable

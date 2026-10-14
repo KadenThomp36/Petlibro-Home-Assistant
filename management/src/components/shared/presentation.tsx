@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from '#/components/ui/card';
+import type { RuntimeAvailability } from '#/domain/device-overview';
 import type { OperationStatus } from '#/domain/operations';
 import type { IntegrationAvailability } from '#/domain/system-status';
 
@@ -28,13 +29,21 @@ export function StatusBadge({ status }: { readonly status: OperationStatus }) {
 export function AvailabilityBadge({
   availability,
 }: {
-  readonly availability: IntegrationAvailability;
+  readonly availability: IntegrationAvailability | RuntimeAvailability;
 }) {
   if (availability === 'ready') {
     return <Badge className="status-ready">Ready</Badge>;
   }
-  if (availability === 'unavailable') {
-    return <Badge className="status-warning">Unavailable</Badge>;
+  if (
+    availability === 'unavailable' ||
+    availability === 'stale' ||
+    availability === 'degraded' ||
+    availability === 'unknown'
+  ) {
+    return <Badge className="status-warning">{humanize(availability)}</Badge>;
+  }
+  if (availability === 'unhealthy') {
+    return <Badge variant="destructive">Unhealthy</Badge>;
   }
   return <Badge variant="secondary">Not configured</Badge>;
 }

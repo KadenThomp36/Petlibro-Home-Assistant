@@ -67,6 +67,10 @@ class RenderConfigTests(unittest.TestCase):
                 app = config[app_name]
                 self.assertIsNone(app.log_level)
                 self.assertEqual("trace", app.args["petlibro_log_level"])
+            self.assertEqual(
+                "/data/petlibro_controller_status_PLAF203_EXAMPLE123.json",
+                config["plaf203_example123"].args["management_status_file"],
+            )
 
     def options(self, *, devices=None):
         options = copy.deepcopy(render_config.DEFAULTS)
@@ -98,6 +102,7 @@ class RenderConfigTests(unittest.TestCase):
             "backend.py": "PETLIBRO_BACKEND_SOURCE",
             "camera_metadata.py": "PETLIBRO_CAMERA_METADATA_SOURCE",
             "commands.py": "PETLIBRO_COMMANDS_SOURCE",
+            "controller_status.py": "PETLIBRO_CONTROLLER_STATUS_SOURCE",
             "device_discovery.py": "PETLIBRO_DEVICE_DISCOVERY_SOURCE",
             "dispensing_status.py": "PETLIBRO_DISPENSING_STATUS_SOURCE",
             "feed_plans.py": "PETLIBRO_FEED_PLANS_SOURCE",
@@ -269,6 +274,7 @@ class RenderConfigTests(unittest.TestCase):
                 "backend.py",
                 "camera_metadata.py",
                 "commands.py",
+                "controller_status.py",
                 "device_discovery.py",
                 "dispensing_status.py",
                 "feed_plans.py",

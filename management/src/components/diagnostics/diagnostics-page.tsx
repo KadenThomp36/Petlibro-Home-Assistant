@@ -15,18 +15,20 @@ import {
   CardHeader,
   CardTitle,
 } from '#/components/ui/card';
+import { fetchDeviceOverview } from '#/infrastructure/http/device-overview-client';
 import { fetchStateAgentInspectionAction } from '#/infrastructure/http/operations-client';
-import { fetchSystemStatus } from '#/infrastructure/http/system-status-client';
 
 export function DiagnosticsPage() {
   const statusQuery = useQuery({
-    queryKey: ['system-status'],
-    queryFn: ({ signal }) => fetchSystemStatus(signal),
+    queryKey: ['device-overview'],
+    queryFn: ({ signal }) => fetchDeviceOverview(signal),
+    refetchInterval: 30_000,
   });
   const actionQuery = useQuery({
     queryKey: ['actions', 'state-agent-inspection'],
     queryFn: ({ signal }) => fetchStateAgentInspectionAction(signal),
   });
+  const firstService = statusQuery.data?.services[0];
 
   return (
     <div className="page-stack">
@@ -63,7 +65,7 @@ export function DiagnosticsPage() {
               </p>
             ) : (
               <ul className="diagnostic-source-list">
-                {(statusQuery.data?.integrations ?? []).map((integration) => (
+                {(statusQuery.data?.services ?? []).map((integration) => (
                   <li key={integration.id}>
                     <span>
                       <strong>{integration.name}</strong>
@@ -120,21 +122,30 @@ export function DiagnosticsPage() {
         </Card>
       </div>
 
-      {statusQuery.data === undefined ? null : (
+      {statusQuery.data === undefined || firstService === undefined ? null : (
         <Card>
           <CardHeader>
-            <CardTitle>Management observation</CardTitle>
+            <CardTitle>Runtime observation contract</CardTitle>
             <CardDescription>
-              The application can report its own process status while external
-              adapters remain unavailable.
+              Source, freshness, verification level, and scope remain visible.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ObservationNote
-              source={statusQuery.data.management.observation.source}
-              observedAt={statusQuery.data.management.observation.observedAt}
-              scope={statusQuery.data.management.observation.scope}
+              source={firstService.observation.source}
+              observedAt={
+                firstService.observation.observedAt ??
+                firstService.observation.collectedAt
+              }
+              scope={firstService.observation.scope}
             />
+            {statusQuery.data.warnings.length === 0 ? null : (
+              <ul className="diagnostic-warning-list">
+                {statusQuery.data.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       )}

@@ -571,6 +571,7 @@ def render_management_runtime(
     environment = {
         "NITRO_UNIX_SOCKET": str(application_socket),
         "PETLIBRO_MANAGEMENT_DATA_DIR": str(management_data_dir),
+        "PETLIBRO_RUNTIME_DATA_DIR": str(data_dir),
         "PETLIBRO_WORKER_SOCKET": str(worker_socket),
         "PETLIBRO_STATE_AGENT_TOKEN_FILE": str(token_file),
         "PETLIBRO_STATE_AGENT_TIMEOUT_SECONDS": str(timeout_seconds),
@@ -580,6 +581,7 @@ def render_management_runtime(
     for name in (
         "NITRO_UNIX_SOCKET",
         "PETLIBRO_MANAGEMENT_DATA_DIR",
+        "PETLIBRO_RUNTIME_DATA_DIR",
         "PETLIBRO_WORKER_SOCKET",
         "PETLIBRO_STATE_AGENT_TOKEN_FILE",
         "PETLIBRO_STATE_AGENT_TIMEOUT_SECONDS",
@@ -636,8 +638,14 @@ def status_file_for(stream_name: str) -> str:
     return f"/data/petlibro_camera_status_{stream_name}.json"
 
 
+def controller_status_file_for(product: str, serial: str) -> str:
+    safe_product = re.sub(r"[^A-Za-z0-9_-]+", "_", product)
+    safe_serial = re.sub(r"[^A-Za-z0-9_-]+", "_", serial)
+    return f"/data/petlibro_controller_status_{safe_product}_{safe_serial}.json"
+
+
 def _empty_registry() -> dict[str, object]:
-    return {"schema_version": 1, "devices": {}}
+    return {"schema_version": 1, "devices": {}, "last_update": None}
 
 
 def _default_ready() -> dict[str, bool]:
@@ -981,6 +989,9 @@ def render_appdaemon(
                     "go2rtc_rtsp_port": options["go2rtc_rtsp_port"],
                     "publish_camera_metadata": options["publish_camera_metadata"],
                     "camera_status_file": status_file_for(stream_name),
+                    "management_status_file": controller_status_file_for(
+                        product, serial
+                    ),
                     "camera_metadata_topic_prefix": _camera_topic_prefix(
                         options, product, serial
                     ),
@@ -1070,6 +1081,12 @@ def render_appdaemon(
             os.environ.get(
                 "PETLIBRO_COMMANDS_SOURCE",
                 "/opt/petlibro-local/appdaemon/commands.py",
+            )
+        ),
+        app_dir / "controller_status.py": Path(
+            os.environ.get(
+                "PETLIBRO_CONTROLLER_STATUS_SOURCE",
+                "/opt/petlibro-local/appdaemon/controller_status.py",
             )
         ),
         app_dir / "feed_plans.py": Path(

@@ -1239,6 +1239,117 @@
   align-self: start;
 }
 
+/* Source-aware device projections */
+.device-card-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.device-facts,
+.compact-facts {
+  display: grid;
+  margin: 0;
+}
+
+.device-facts {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+  padding-bottom: 1rem;
+}
+
+.device-facts > div,
+.compact-facts > div {
+  min-width: 0;
+}
+
+.device-facts dt,
+.compact-facts dt {
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
+}
+
+.device-facts dd,
+.compact-facts dd {
+  overflow-wrap: anywhere;
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.device-observation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+.device-observation-panel {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklch, var(--muted) 48%, transparent);
+  padding: 1rem;
+}
+
+.device-observation-panel > p {
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.device-panel-title {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.9rem;
+}
+
+.device-panel-title > svg {
+  width: 1rem;
+  color: var(--primary);
+}
+
+.compact-facts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.device-observation-panel .observation-note {
+  margin-top: 1rem;
+}
+
+.mono-value {
+  font-family: var(--font-mono);
+  font-size: 0.7rem !important;
+}
+
+.device-warning-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 1rem;
+}
+
+.device-warning-list [data-slot='badge'] {
+  height: auto;
+  white-space: normal;
+  text-align: left;
+}
+
+.diagnostic-warning-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 1rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--muted-foreground);
+  font-size: 0.76rem;
+}
+
 .interpretation-box {
   margin-top: 1rem;
 }
@@ -1539,8 +1650,13 @@
 
   .two-column-grid,
   .diagnostics-layout,
-  .setup-layout {
+  .setup-layout,
+  .device-observation-grid {
     grid-template-columns: 1fr;
+  }
+
+  .device-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .first-run-card [data-slot='card-content'] {
@@ -1605,6 +1721,20 @@
   }
 
   .diagnostic-source-list li [data-slot='badge'] {
+    justify-self: start;
+  }
+
+  .device-facts,
+  .compact-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .device-panel-title {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .device-panel-title [data-slot='badge'] {
+    grid-column: 2;
     justify-self: start;
   }
 

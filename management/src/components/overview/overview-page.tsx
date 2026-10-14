@@ -29,11 +29,14 @@ import {
   CardTitle,
 } from '#/components/ui/card';
 import { Skeleton } from '#/components/ui/skeleton';
+import type { DeviceOverviewSnapshot } from '#/domain/device-overview';
 import type { SystemStatusSnapshot } from '#/domain/system-status';
+import { fetchDeviceOverview } from '#/infrastructure/http/device-overview-client';
 import { fetchOperations } from '#/infrastructure/http/operations-client';
 import { fetchSystemStatus } from '#/infrastructure/http/system-status-client';
 
 type SystemStatusQuery = UseQueryResult<SystemStatusSnapshot, Error>;
+type DeviceOverviewQuery = UseQueryResult<DeviceOverviewSnapshot, Error>;
 
 export function OverviewPage() {
   const statusQuery = useQuery({
@@ -46,6 +49,11 @@ export function OverviewPage() {
     queryFn: ({ signal }) => fetchOperations(signal),
     refetchInterval: 5_000,
   });
+  const deviceQuery = useQuery({
+    queryKey: ['device-overview'],
+    queryFn: ({ signal }) => fetchDeviceOverview(signal),
+    refetchInterval: 30_000,
+  });
 
   return (
     <div className="page-stack">
@@ -56,12 +64,18 @@ export function OverviewPage() {
       >
         <Button
           variant="outline"
-          onClick={() => statusQuery.refetch()}
-          disabled={statusQuery.isFetching}
+          onClick={() =>
+            Promise.all([statusQuery.refetch(), deviceQuery.refetch()])
+          }
+          disabled={statusQuery.isFetching || deviceQuery.isFetching}
         >
           <RefreshCw
             aria-hidden="true"
-            className={statusQuery.isFetching ? 'animate-spin' : undefined}
+            className={
+              statusQuery.isFetching || deviceQuery.isFetching
+                ? 'animate-spin'
+                : undefined
+            }
           />
           Refresh status
         </Button>
@@ -75,16 +89,24 @@ export function OverviewPage() {
             <ListChecks />
           </span>
           <div>
-            <p className="eyebrow">Device setup</p>
-            <h2>No device projection is configured</h2>
+            <p className="eyebrow">Device projection</p>
+            <h2>
+              {deviceQuery.data?.devices.length
+                ? `${deviceQuery.data.devices.length} feeder projection${deviceQuery.data.devices.length === 1 ? '' : 's'} available`
+                : 'No feeder has been observed'}
+            </h2>
             <p>
-              The management application cannot yet identify or summarize a
-              feeder. Review the setup boundary and current foundation readiness
-              without assuming the operational services are healthy.
+              {deviceQuery.data?.devices.length
+                ? 'Identity, controller verification, and camera session observations are correlated without changing their operational owners.'
+                : 'Discovery remains active when configured. An empty projection means no supported identity has been observed, not that the runtime is healthy.'}
             </p>
           </div>
           <Button asChild>
-            <Link to="/setup">Review setup</Link>
+            <Link to={deviceQuery.data?.devices.length ? '/devices' : '/setup'}>
+              {deviceQuery.data?.devices.length
+                ? 'View devices'
+                : 'Review setup'}
+            </Link>
           </Button>
         </CardContent>
       </Card>
@@ -123,9 +145,9 @@ export function OverviewPage() {
         <SectionHeading
           eyebrow="Service health"
           title="Honest status, by source"
-          aside={<Badge variant="outline">No device data queried</Badge>}
+          aside={<Badge variant="outline">Read-only observations</Badge>}
         />
-        <IntegrationGrid query={statusQuery} />
+        <IntegrationGrid query={deviceQuery} />
       </section>
 
       <section aria-labelledby="recent-operations-title">
@@ -241,7 +263,7 @@ function ManagementStatusCard({
   );
 }
 
-function IntegrationGrid({ query }: { readonly query: SystemStatusQuery }) {
+function IntegrationGrid({ query }: { readonly query: DeviceOverviewQuery }) {
   if (query.isPending) {
     return (
       <div className="integration-grid">
@@ -262,7 +284,7 @@ function IntegrationGrid({ query }: { readonly query: SystemStatusQuery }) {
 
   return (
     <div className="integration-grid">
-      {query.data.integrations.map((integration) => (
+      {query.data.services.map((integration) => (
         <Card key={integration.id} className="integration-card">
           <CardHeader>
             <div className="integration-title">
@@ -273,7 +295,12 @@ function IntegrationGrid({ query }: { readonly query: SystemStatusQuery }) {
           </CardHeader>
           <CardContent>
             <p>{integration.detail}</p>
-            <small>{integration.observation.scope}</small>
+            <small>
+              {integration.observation.source} ·{' '}
+              {integration.observation.freshness}
+              <br />
+              {integration.observation.scope}
+            </small>
           </CardContent>
         </Card>
       ))}

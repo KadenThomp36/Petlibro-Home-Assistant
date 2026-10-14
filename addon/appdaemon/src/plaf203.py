@@ -9,6 +9,7 @@ from appdaemon.plugins.mqtt import mqttapi
 from backend import Backend
 from camera_metadata import CameraMetadataPublisher
 from commands import CommandRouter
+from controller_status import ControllerStatusWriter
 from dispensing_status import DispensingStatusProjector, FoodOutputProgress
 from feeder_mqtt_validation import validate_feeder_mqtt_destination
 from ha_entities import HomeAssistantDiscoveryMqtt, HomeAssistantStatePublisher
@@ -49,6 +50,15 @@ class Plaf203(adbase.ADBase):
         self._overall_available = False
         self.storage = Storage(self.ad, "plaf203", self.serial_number)
         self.storage.initialize()
+        self.controller_status = ControllerStatusWriter(
+            self.args.get(
+                "management_status_file",
+                f"/data/petlibro_controller_status_{self.serial_number}.json",
+            ),
+            self.args.get("product", "PLAF203"),
+            self.serial_number,
+            self.logger,
+        )
 
         state_agent_url = str(self.args.get("petlibro_state_agent_url", "")).strip()
         if state_agent_url:
@@ -147,15 +157,22 @@ class Plaf203(adbase.ADBase):
             log_level=log_level,
         )
         self.camera_metadata.start()
+        self.controller_status_timer = self.ad.run_every(
+            self._controller_status_heartbeat, "immediate", 30
+        )
+        self._write_controller_status()
         self.logger.info("controller initialized", serial=self.serial_number)
 
     def terminate(self) -> None:
+        if getattr(self, "controller_status_timer", None) is not None:
+            self.ad.cancel_timer(self.controller_status_timer, True)
         self.camera_metadata.stop()
         self.updater.stop()
         self.coordinator.shutdown()
         self.storage.terminate()
         self.dispensing_status.on_feeder_disconnected()
         self.state.publish("device/online", False)
+        self._write_controller_status(lifecycle="stopped")
 
     def _configure_feeder_mqtt_persistence(self) -> None:
         enabled = bool(self.args.get("persist_feeder_mqtt", False))
@@ -191,7 +208,7 @@ class Plaf203(adbase.ADBase):
         self.backend.went_offline_listen(self._went_offline)
         self.backend.ntp_sync_status_listen(self._ntp_sync_status)
         self.backend.error_listen(self._device_error)
-        self.backend.heartbeat_event_listen(self.coordinator.on_heartbeat)
+        self.backend.heartbeat_event_listen(self._heartbeat_event)
         self.backend.persistent_state_hint_listen(
             self.coordinator.on_persistent_state_hint
         )
@@ -213,6 +230,7 @@ class Plaf203(adbase.ADBase):
     def _coordinator_availability_set(self, available: bool) -> None:
         self._overall_available = available
         self.state.publish("device/online", available)
+        self._write_controller_status()
         if not available:
             return
         self.updater.on_usable_connection()
@@ -240,7 +258,9 @@ class Plaf203(adbase.ADBase):
                 )
 
     def _device_started(self) -> None:
+        self._mark_controller_feeder_activity()
         self.coordinator.on_feeder_connected()
+        self._write_controller_status()
         if self.persist_feeder_mqtt:
             self._feeder_mqtt_persistence_due = True
             if self.coordinator.is_ready_for_user_write():
@@ -266,12 +286,34 @@ class Plaf203(adbase.ADBase):
     def _went_online(self) -> None:
         self.logger.info("device online", serial=self.serial_number)
         self.dispensing_status.on_feeder_connected(self.backend.connection_generation)
+        self._mark_controller_feeder_activity()
         self.coordinator.on_feeder_connected()
+        self._write_controller_status()
 
     def _went_offline(self) -> None:
         self.logger.info("device offline", serial=self.serial_number)
         self.dispensing_status.on_feeder_disconnected()
         self.coordinator.on_feeder_disconnected("feeder MQTT heartbeat lost")
+        self._write_controller_status()
+
+    def _heartbeat_event(self) -> None:
+        self._mark_controller_feeder_activity()
+        self.coordinator.on_heartbeat()
+        self._write_controller_status()
+
+    def _mark_controller_feeder_activity(self) -> None:
+        writer = getattr(self, "controller_status", None)
+        if writer is not None:
+            writer.mark_feeder_activity()
+
+    def _controller_status_heartbeat(self, _kwargs=None) -> None:
+        self._write_controller_status()
+
+    def _write_controller_status(self, lifecycle="running") -> None:
+        coordinator = getattr(self, "coordinator", None)
+        writer = getattr(self, "controller_status", None)
+        if coordinator is not None and writer is not None:
+            writer.write(coordinator, lifecycle=lifecycle)
 
     def _food_output_progress(self, progress: FoodOutputProgress) -> None:
         self.dispensing_status.apply_grain_event(
@@ -287,6 +329,9 @@ class Plaf203(adbase.ADBase):
             return
 
         self.logger.info("Home Assistant online; restoring MQTT projections")
+        writer = getattr(self, "controller_status", None)
+        if writer is not None:
+            writer.mark_home_assistant_birth()
         self.discovery.discovery_issue()
         self.state.publish("device/online", self._overall_available)
         latest_truth = self.coordinator.latest_truth()
@@ -297,6 +342,7 @@ class Plaf203(adbase.ADBase):
             updater.on_home_assistant_birth()
         self.dispensing_status.mark_unavailable()
         self.backend.request_runtime_snapshot("Home Assistant birth")
+        self._write_controller_status()
 
     def _ntp_sync_status(self, successful: bool) -> None:
         if successful:

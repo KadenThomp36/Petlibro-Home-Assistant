@@ -58,16 +58,26 @@ There is no arbitrary file, path, command, shell, or package-management API.
 
 ### Home Assistant add-on
 
-[`addon/`](../addon/README.md) packages two independent s6 services:
+[`addon/`](../addon/README.md) packages independently supervised services:
 
 - the AppDaemon controller, which handles feeder MQTT, Home Assistant entity
   projection, State Agent reconciliation, and signed update orchestration;
 - the go2rtc fork, which handles LAN camera discovery, Petlibro media transport,
   and standard streaming outputs.
+- the Petlibro Management Node application, private Python capability worker,
+  and Nginx Ingress/direct-access gateway.
 
 Home Assistant options are rendered atomically into service configuration under
 `/data`. s6 owns restart and shutdown behavior; neither application supervises
 the other.
+
+For read-only management integration, AppDaemon owns an atomic per-device
+controller status contract and a heartbeat on `devices.json`. The contract
+contains controller lifecycle, feeder MQTT/reconciliation state, State Agent
+health, and a bounded verified-state summary; it excludes credentials and
+device-changing commands. Management correlates these files by product/serial
+with the existing go2rtc status files. It may probe the configured broker with
+MQTT CONNECT/CONNACK, but does not subscribe or publish.
 
 ## State ownership
 
@@ -81,6 +91,7 @@ The integration distinguishes state by authority and lifetime.
 | Runtime telemetry | OEM MQTT events/attributes | Projected as live observations |
 | Last feed observations | Completed grain-event sequence | Retained historical facts |
 | Camera runtime | go2rtc status file | Validated and projected to MQTT |
+| Management device view | AppDaemon registry/controller files and go2rtc status | Read-only source-aware projection; never a new feeder authority |
 
 The State Agent labels decoded core fields as:
 

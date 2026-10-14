@@ -20,6 +20,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as ApiV1OperationsRouteImport } from './routes/api.v1.operations'
 import { Route as ApiV1ActionsStateAgentInspectionRouteImport } from './routes/api.v1.actions.state-agent-inspection'
+import { Route as ApiV1DevicesOverviewRouteImport } from './routes/api.v1.devices.overview'
 import { Route as ApiV1OperationsOperationIdRouteImport } from './routes/api.v1.operations.$operationId'
 import { Route as ApiV1SystemStatusRouteImport } from './routes/api.v1.system.status'
 
@@ -79,6 +80,11 @@ const ApiV1ActionsStateAgentInspectionRoute =
     path: '/api/v1/actions/state-agent-inspection',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiV1DevicesOverviewRoute = ApiV1DevicesOverviewRouteImport.update({
+  id: '/api/v1/devices/overview',
+  path: '/api/v1/devices/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiV1OperationsOperationIdRoute =
   ApiV1OperationsOperationIdRouteImport.update({
     id: '/$operationId',
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/api/v1/operations': typeof ApiV1OperationsRouteWithChildren
   '/api/v1/actions/state-agent-inspection': typeof ApiV1ActionsStateAgentInspectionRoute
+  '/api/v1/devices/overview': typeof ApiV1DevicesOverviewRoute
   '/api/v1/operations/$operationId': typeof ApiV1OperationsOperationIdRoute
   '/api/v1/system/status': typeof ApiV1SystemStatusRoute
 }
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/api/v1/operations': typeof ApiV1OperationsRouteWithChildren
   '/api/v1/actions/state-agent-inspection': typeof ApiV1ActionsStateAgentInspectionRoute
+  '/api/v1/devices/overview': typeof ApiV1DevicesOverviewRoute
   '/api/v1/operations/$operationId': typeof ApiV1OperationsOperationIdRoute
   '/api/v1/system/status': typeof ApiV1SystemStatusRoute
 }
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/api/v1/operations': typeof ApiV1OperationsRouteWithChildren
   '/api/v1/actions/state-agent-inspection': typeof ApiV1ActionsStateAgentInspectionRoute
+  '/api/v1/devices/overview': typeof ApiV1DevicesOverviewRoute
   '/api/v1/operations/$operationId': typeof ApiV1OperationsOperationIdRoute
   '/api/v1/system/status': typeof ApiV1SystemStatusRoute
 }
@@ -151,6 +160,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/api/v1/operations'
     | '/api/v1/actions/state-agent-inspection'
+    | '/api/v1/devices/overview'
     | '/api/v1/operations/$operationId'
     | '/api/v1/system/status'
   fileRoutesByTo: FileRoutesByTo
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/api/v1/operations'
     | '/api/v1/actions/state-agent-inspection'
+    | '/api/v1/devices/overview'
     | '/api/v1/operations/$operationId'
     | '/api/v1/system/status'
   id:
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/api/v1/operations'
     | '/api/v1/actions/state-agent-inspection'
+    | '/api/v1/devices/overview'
     | '/api/v1/operations/$operationId'
     | '/api/v1/system/status'
   fileRoutesById: FileRoutesById
@@ -197,6 +209,7 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   ApiV1OperationsRoute: typeof ApiV1OperationsRouteWithChildren
   ApiV1ActionsStateAgentInspectionRoute: typeof ApiV1ActionsStateAgentInspectionRoute
+  ApiV1DevicesOverviewRoute: typeof ApiV1DevicesOverviewRoute
   ApiV1SystemStatusRoute: typeof ApiV1SystemStatusRoute
 }
 
@@ -279,6 +292,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1ActionsStateAgentInspectionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/devices/overview': {
+      id: '/api/v1/devices/overview'
+      path: '/api/v1/devices/overview'
+      fullPath: '/api/v1/devices/overview'
+      preLoaderRoute: typeof ApiV1DevicesOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/operations/$operationId': {
       id: '/api/v1/operations/$operationId'
       path: '/$operationId'
@@ -320,6 +340,7 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   ApiV1OperationsRoute: ApiV1OperationsRouteWithChildren,
   ApiV1ActionsStateAgentInspectionRoute: ApiV1ActionsStateAgentInspectionRoute,
+  ApiV1DevicesOverviewRoute: ApiV1DevicesOverviewRoute,
   ApiV1SystemStatusRoute: ApiV1SystemStatusRoute,
 }
 export const routeTree = rootRouteImport

@@ -49,6 +49,12 @@ wait_for_http "http://127.0.0.1:${direct_port}/api/v1/system/status"
 
 curl -fsS "http://127.0.0.1:${direct_port}/" >"${temporary}/direct.html"
 curl -fsS "http://127.0.0.1:${direct_port}/operations" >"${temporary}/deep.html"
+curl -fsS "http://127.0.0.1:${direct_port}/api/v1/devices/overview" \
+  >"${temporary}/device-overview.json"
+grep -q '"apiVersion":"v1"' "${temporary}/device-overview.json"
+grep -q '"id":"appdaemon"' "${temporary}/device-overview.json"
+grep -q '"id":"go2rtc"' "${temporary}/device-overview.json"
+grep -q '"id":"mosquitto"' "${temporary}/device-overview.json"
 curl -fsS -H 'X-Ingress-Path: /api/hassio_ingress/test-token' \
   "http://127.0.0.1:${ingress_port}/" >"${temporary}/ingress.html"
 grep -q '/api/hassio_ingress/test-token/assets/' "${temporary}/ingress.html"
@@ -84,6 +90,8 @@ test "$(docker exec "${container}" stat -c '%a' \
 docker rm -f "${container}" >/dev/null
 run_addon 0
 wait_for_http "http://127.0.0.1:${ingress_port}/api/v1/system/status"
+curl -fsS "http://127.0.0.1:${ingress_port}/api/v1/devices/overview" \
+  >/dev/null
 curl -fsS "http://127.0.0.1:${ingress_port}/api/v1/operations/${operation_id}" \
   >/dev/null
 if curl -fsS --max-time 1 "http://127.0.0.1:${direct_port}/" >/dev/null 2>&1; then
