@@ -1,0 +1,88 @@
+name: Publish standalone go2rtc binaries
+
+# Builds the Petlibro go2rtc fork in addon/go2rtc as static Linux binaries and
+# attaches them, with SHA256SUMS, to a GitHub release. This lets the camera
+# transport be used outside the add-on image (for example by a Home Assistant
+# integration or a plain Docker/systemd go2rtc install) without committing
+# compiled binaries to the repository.
+#
+# Push a tag named go2rtc-v<version> to publish. workflow_dispatch runs the same
+# tests and builds as a dry run without creating a release.
+
+on:
+  push:
+    tags:
+      - "go2rtc-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-go2rtc-binaries-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Test, build, and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: addon/go2rtc
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read Go version from the add-on Dockerfile
+        id: go
+        working-directory: .
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^ARG GO_VERSION=//p' addon/Dockerfile)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ steps.go.outputs.version }}
+          cache-dependency-path: addon/go2rtc/go.sum
+
+      - name: Run camera transport tests
+        run: |
+          set -euo pipefail
+          go test ./pkg/petlibro ./cmd/petlibro-resolve -count=1
+          go vet ./internal/streams ./pkg/petlibro ./pkg/rtsp ./cmd/petlibro-resolve
+
+      - name: Build static binaries
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for target in amd64 arm64 arm:7; do
+            arch=${target%%:*}
+            goarm=""
+            [[ "$target" == *:* ]] && goarm=${target##*:}
+            name="petlibro-go2rtc_linux_${arch}${goarm:+v$goarm}"
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" GOARM="$goarm" \
+              go build -trimpath -ldflags="-s -w" -o "dist/$name" .
+          done
+          cp LICENSE dist/LICENSE-go2rtc
+          cp ../../LICENSE dist/LICENSE-petlibro-local
+          (cd dist && sha256sum petlibro-go2rtc_* > SHA256SUMS)
+          cat dist/SHA256SUMS
+
+      - name: Smoke-test the amd64 binary
+        run: ./dist/petlibro-go2rtc_linux_amd64 -version
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/go2rtc-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" dist/* \
+            --title "Standalone go2rtc ${TAG#go2rtc-}" \
+            --notes "Static Linux builds of the Petlibro go2rtc fork from \`addon/go2rtc\` at ${GITHUB_SHA}. Verify downloads against \`SHA256SUMS\`."

@@ -39,6 +39,21 @@ Confirm the binary starts:
 ./go2rtc -version
 ```
 
+## Prebuilt binaries
+
+Static Linux builds (`amd64`, `arm64`, `armv7`) are attached to the repository's
+`go2rtc-v*` releases, built by
+[`publish-go2rtc-binaries.yml`](../../.github/workflows/publish-go2rtc-binaries.yml)
+after the camera transport tests pass. They have no libc dependency, so they run
+on glibc and musl hosts alike, including inside the Home Assistant Core
+container. Verify a download against the release's `SHA256SUMS`:
+
+```bash
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
+Maintainers publish a build by pushing a tag such as `go2rtc-v0.3.12`.
+
 ## Configure a camera
 
 Copy the tracked example, then edit the copy with your camera's LAN address and
